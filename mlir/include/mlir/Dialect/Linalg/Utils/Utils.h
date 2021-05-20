@@ -208,6 +208,11 @@ struct LinalgLoopDistributionOptions {
   SmallVector<DistributionMethod, 0> distributionMethod = {};
 };
 
+/// Update the `lb`, `ub` and `step` to get per processor `lb`, `ub` and `step`.
+void updateBoundsForCyclicDistribution(OpBuilder &builder, Location loc,
+                                       Value procId, Value nprocs, Value &lb,
+                                       Value &ub, Value &step);
+
 //===----------------------------------------------------------------------===//
 // Generic op region utilities
 //===----------------------------------------------------------------------===//
@@ -239,19 +244,15 @@ struct RegionMatcher {
 /// Utility class used to generate nested loops with ranges described by
 /// `loopRanges` and loop type described by the `iteratorTypes`. `bodyBuilderFn`
 /// is used to generate the body of the innermost loop. It is passed a range
-/// of loop induction variables.
+/// of loop induction variables and a range of iterArgs.
 template <typename LoopTy>
 struct GenerateLoopNest {
-  using IndexedValueTy =
-      typename std::conditional<std::is_same<LoopTy, AffineForOp>::value,
-                                edsc::intrinsics::AffineIndexedValue,
-                                edsc::intrinsics::MemRefIndexedValue>::type;
-
-  static void
-  doit(ArrayRef<Range> loopRanges, ValueRange iterArgInitValues,
-       ArrayRef<Attribute> iteratorTypes,
-       function_ref<scf::ValueVector(ValueRange, ValueRange)> bodyBuilderFn,
-       Optional<LinalgLoopDistributionOptions> = None);
+  static void doit(OpBuilder &b, Location loc, ArrayRef<Range> loopRanges,
+                   LinalgOp linalgOp, ArrayRef<Attribute> iteratorTypes,
+                   function_ref<scf::ValueVector(OpBuilder &, Location,
+                                                 ValueRange, ValueRange)>
+                       bodyBuilderFn,
+                   Optional<LinalgLoopDistributionOptions> = None);
 };
 
 } // namespace linalg

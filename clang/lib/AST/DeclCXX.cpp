@@ -2073,19 +2073,21 @@ ExplicitSpecifier ExplicitSpecifier::getFromDecl(FunctionDecl *Function) {
   }
 }
 
-CXXDeductionGuideDecl *CXXDeductionGuideDecl::Create(
-    ASTContext &C, DeclContext *DC, SourceLocation StartLoc,
-    ExplicitSpecifier ES, const DeclarationNameInfo &NameInfo, QualType T,
-    TypeSourceInfo *TInfo, SourceLocation EndLocation) {
+CXXDeductionGuideDecl *
+CXXDeductionGuideDecl::Create(ASTContext &C, DeclContext *DC,
+                              SourceLocation StartLoc, ExplicitSpecifier ES,
+                              const DeclarationNameInfo &NameInfo, QualType T,
+                              TypeSourceInfo *TInfo, SourceLocation EndLocation,
+                              CXXConstructorDecl *Ctor) {
   return new (C, DC) CXXDeductionGuideDecl(C, DC, StartLoc, ES, NameInfo, T,
-                                           TInfo, EndLocation);
+                                           TInfo, EndLocation, Ctor);
 }
 
 CXXDeductionGuideDecl *CXXDeductionGuideDecl::CreateDeserialized(ASTContext &C,
                                                                  unsigned ID) {
   return new (C, ID) CXXDeductionGuideDecl(
       C, nullptr, SourceLocation(), ExplicitSpecifier(), DeclarationNameInfo(),
-      QualType(), nullptr, SourceLocation());
+      QualType(), nullptr, SourceLocation(), nullptr);
 }
 
 RequiresExprBodyDecl *RequiresExprBodyDecl::Create(
@@ -2600,19 +2602,19 @@ void CXXConstructorDecl::anchor() {}
 CXXConstructorDecl *CXXConstructorDecl::CreateDeserialized(ASTContext &C,
                                                            unsigned ID,
                                                            uint64_t AllocKind) {
-  bool hasTraillingExplicit = static_cast<bool>(AllocKind & TAKHasTailExplicit);
+  bool hasTrailingExplicit = static_cast<bool>(AllocKind & TAKHasTailExplicit);
   bool isInheritingConstructor =
       static_cast<bool>(AllocKind & TAKInheritsConstructor);
   unsigned Extra =
       additionalSizeToAlloc<InheritedConstructor, ExplicitSpecifier>(
-          isInheritingConstructor, hasTraillingExplicit);
+          isInheritingConstructor, hasTrailingExplicit);
   auto *Result = new (C, ID, Extra) CXXConstructorDecl(
       C, nullptr, SourceLocation(), DeclarationNameInfo(), QualType(), nullptr,
       ExplicitSpecifier(), false, false, ConstexprSpecKind::Unspecified,
       InheritedConstructor(), nullptr);
   Result->setInheritingConstructor(isInheritingConstructor);
   Result->CXXConstructorDeclBits.HasTrailingExplicitSpecifier =
-      hasTraillingExplicit;
+      hasTrailingExplicit;
   Result->setExplicitSpecifier(ExplicitSpecifier());
   return Result;
 }

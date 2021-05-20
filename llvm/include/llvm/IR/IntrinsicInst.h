@@ -395,9 +395,11 @@ public:
 
   /// \return the mask parameter or nullptr.
   Value *getMaskParam() const;
+  void setMaskParam(Value *);
 
   /// \return the vector length parameter or nullptr.
   Value *getVectorLengthParam() const;
+  void setVectorLengthParam(Value *);
 
   /// \return whether the vector length param can be ignored.
   bool canIgnoreVectorLengthParam() const;
@@ -415,12 +417,12 @@ public:
   }
 
   // Equivalent non-predicated opcode
-  unsigned getFunctionalOpcode() const {
+  Optional<unsigned> getFunctionalOpcode() const {
     return GetFunctionalOpcodeForVP(getIntrinsicID());
   }
 
   // Equivalent non-predicated opcode
-  static unsigned GetFunctionalOpcodeForVP(Intrinsic::ID ID);
+  static Optional<unsigned> GetFunctionalOpcodeForVP(Intrinsic::ID ID);
 };
 
 /// This is the common base class for constrained floating point intrinsics.

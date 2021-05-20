@@ -371,7 +371,6 @@ PreservedAnalyses JumpThreadingPass::run(Function &F,
   if (!Changed)
     return PreservedAnalyses::all();
   PreservedAnalyses PA;
-  PA.preserve<GlobalsAA>();
   PA.preserve<DominatorTreeAnalysis>();
   PA.preserve<LazyValueAnalysis>();
   return PA;
@@ -2750,7 +2749,8 @@ void JumpThreadingPass::unfoldSelectInstr(BasicBlock *Pred, BasicBlock *BB,
   PredTerm->removeFromParent();
   NewBB->getInstList().insert(NewBB->end(), PredTerm);
   // Create a conditional branch and update PHI nodes.
-  BranchInst::Create(NewBB, BB, SI->getCondition(), Pred);
+  auto *BI = BranchInst::Create(NewBB, BB, SI->getCondition(), Pred);
+  BI->applyMergedLocation(PredTerm->getDebugLoc(), SI->getDebugLoc());
   SIUse->setIncomingValue(Idx, SI->getFalseValue());
   SIUse->addIncoming(SI->getTrueValue(), NewBB);
 

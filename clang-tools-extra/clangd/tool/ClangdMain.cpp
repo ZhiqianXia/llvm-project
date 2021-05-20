@@ -292,6 +292,14 @@ opt<int> LimitResults{
     init(100),
 };
 
+opt<int> ReferencesLimit{
+    "limit-references",
+    cat(Features),
+    desc("Limit the number of references returned by clangd. "
+         "0 means no limit (default=1000)"),
+    init(1000),
+};
+
 list<std::string> TweakList{
     "tweaks",
     cat(Features),
@@ -307,6 +315,9 @@ opt<bool> FoldingRanges{
     init(false),
     Hidden,
 };
+
+opt<bool> InlayHints{"inlay-hints", cat(Features),
+                     desc("Enable preview of InlayHints feature"), init(false)};
 
 opt<unsigned> WorkerThreadsCount{
     "j",
@@ -551,6 +562,8 @@ std::unique_ptr<SymbolIndex>
 loadExternalIndex(const Config::ExternalIndexSpec &External,
                   AsyncTaskRunner *Tasks) {
   switch (External.Kind) {
+  case Config::ExternalIndexSpec::None:
+    break;
   case Config::ExternalIndexSpec::Server:
     log("Associating {0} with remote index at {1}.", External.MountPoint,
         External.Location);
@@ -816,6 +829,7 @@ clangd accepts flags on the commandline, and in the CLANGD_FLAGS environment var
   }
 #endif
   Opts.BackgroundIndex = EnableBackgroundIndex;
+  Opts.ReferencesLimit = ReferencesLimit;
   auto PAI = createProjectAwareIndex(loadExternalIndex, Sync);
   if (StaticIdx) {
     IdxStack.emplace_back(std::move(StaticIdx));
@@ -827,6 +841,7 @@ clangd accepts flags on the commandline, and in the CLANGD_FLAGS environment var
   }
   Opts.AsyncThreadsCount = WorkerThreadsCount;
   Opts.FoldingRanges = FoldingRanges;
+  Opts.InlayHints = InlayHints;
   Opts.MemoryCleanup = getMemoryCleanupFunction();
 
   Opts.CodeComplete.IncludeIneligibleResults = IncludeIneligibleResults;
@@ -853,8 +868,8 @@ clangd accepts flags on the commandline, and in the CLANGD_FLAGS environment var
     if (llvm::sys::path::user_config_directory(UserConfig)) {
       llvm::sys::path::append(UserConfig, "clangd", "config.yaml");
       vlog("User config file is {0}", UserConfig);
-      ProviderStack.push_back(
-          config::Provider::fromYAMLFile(UserConfig, /*Directory=*/"", TFS));
+      ProviderStack.push_back(config::Provider::fromYAMLFile(
+          UserConfig, /*Directory=*/"", TFS, /*Trusted=*/true));
     } else {
       elog("Couldn't determine user config file, not loading");
     }

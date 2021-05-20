@@ -6515,11 +6515,9 @@ QualType TreeTransform<Derived>::TransformAutoType(TypeLocBuilder &TLB,
   ConceptDecl *NewCD = nullptr;
   TemplateArgumentListInfo NewTemplateArgs;
   NestedNameSpecifierLoc NewNestedNameSpec;
-  if (TL.getTypePtr()->isConstrained()) {
-    NewCD = cast_or_null<ConceptDecl>(
-        getDerived().TransformDecl(
-            TL.getConceptNameLoc(),
-            TL.getTypePtr()->getTypeConstraintConcept()));
+  if (T->isConstrained()) {
+    NewCD = cast_or_null<ConceptDecl>(getDerived().TransformDecl(
+        TL.getConceptNameLoc(), T->getTypeConstraintConcept()));
 
     NewTemplateArgs.setLAngleLoc(TL.getLAngleLoc());
     NewTemplateArgs.setRAngleLoc(TL.getRAngleLoc());
@@ -6541,7 +6539,8 @@ QualType TreeTransform<Derived>::TransformAutoType(TypeLocBuilder &TLB,
 
   QualType Result = TL.getType();
   if (getDerived().AlwaysRebuild() || NewDeduced != OldDeduced ||
-      T->isDependentType()) {
+      T->isDependentType() || T->isConstrained()) {
+    // FIXME: Maybe don't rebuild if all template arguments are the same.
     llvm::SmallVector<TemplateArgument, 4> NewArgList;
     NewArgList.reserve(NewArgList.size());
     for (const auto &ArgLoc : NewTemplateArgs.arguments())
@@ -7325,7 +7324,8 @@ TreeTransform<Derived>::TransformAttributedStmt(AttributedStmt *S,
   for (const auto *I : S->getAttrs()) {
     const Attr *R = getDerived().TransformAttr(I);
     AttrsChanged |= (I != R);
-    Attrs.push_back(R);
+    if (R)
+      Attrs.push_back(R);
   }
 
   StmtResult SubStmt = getDerived().TransformStmt(S->getSubStmt(), SDK);
@@ -7334,6 +7334,11 @@ TreeTransform<Derived>::TransformAttributedStmt(AttributedStmt *S,
 
   if (SubStmt.get() == S->getSubStmt() && !AttrsChanged)
     return S;
+
+  // If transforming the attributes failed for all of the attributes in the
+  // statement, don't make an AttributedStmt without attributes.
+  if (Attrs.empty())
+    return SubStmt;
 
   return getDerived().RebuildAttributedStmt(S->getAttrLoc(), Attrs,
                                             SubStmt.get());
