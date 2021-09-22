@@ -135,9 +135,16 @@ public:
   /// Returns true if this affine map is a single result constant function.
   bool isSingleConstant() const;
 
+  /// Returns true if this affine map has only constant results.
+  bool isConstant() const;
+
   /// Returns the constant result of this map. This methods asserts that the map
   /// has a single constant result.
   int64_t getSingleConstantResult() const;
+
+  /// Returns the constant results of this map. This method asserts that the map
+  /// has all constant results.
+  SmallVector<int64_t> getConstantResults() const;
 
   // Prints affine map to 'os'.
   void print(raw_ostream &os) const;
@@ -154,6 +161,10 @@ public:
   /// Extracts the position of the dimensional expression at the given result,
   /// when the caller knows it is safe to do so.
   unsigned getDimPosition(unsigned idx) const;
+
+  /// Extracts the permuted position where given input index resides.
+  /// Fails when called on a non-permutation.
+  unsigned getPermutedPosition(unsigned input) const;
 
   /// Return true if any affine expression involves AffineDimExpr `position`.
   bool isFunctionOfDim(unsigned position) const {
@@ -190,29 +201,38 @@ public:
                     unsigned numResultDims, unsigned numResultSyms) const;
 
   /// Sparse replace method. Apply AffineExpr::replace(`map`) to each of the
+  /// results and return a new AffineMap with the new results and with inferred
+  /// number of dims and symbols.
+  AffineMap replace(const DenseMap<AffineExpr, AffineExpr> &map) const;
+
+  /// Sparse replace method. Apply AffineExpr::replace(`map`) to each of the
   /// results and return a new AffineMap with the new results and with the
   /// specified number of dims and symbols.
   AffineMap replace(const DenseMap<AffineExpr, AffineExpr> &map,
                     unsigned numResultDims, unsigned numResultSyms) const;
 
-  /// Replace dims[0 .. numDims - 1] by dims[shift .. shift + numDims - 1].
-  AffineMap shiftDims(unsigned shift) const {
-    return AffineMap::get(
-        getNumDims() + shift, getNumSymbols(),
-        llvm::to_vector<4>(llvm::map_range(
-            getResults(),
-            [&](AffineExpr e) { return e.shiftDims(getNumDims(), shift); })),
-        getContext());
+  /// Replace dims[offset ... numDims)
+  /// by dims[offset + shift ... shift + numDims).
+  AffineMap shiftDims(unsigned shift, unsigned offset = 0) const {
+    assert(offset <= getNumDims());
+    return AffineMap::get(getNumDims() + shift, getNumSymbols(),
+                          llvm::to_vector<4>(llvm::map_range(
+                              getResults(),
+                              [&](AffineExpr e) {
+                                return e.shiftDims(getNumDims(), shift, offset);
+                              })),
+                          getContext());
   }
 
-  /// Replace symbols[0 .. numSymbols - 1] by
-  ///         symbols[shift .. shift + numSymbols - 1].
-  AffineMap shiftSymbols(unsigned shift) const {
+  /// Replace symbols[offset ... numSymbols)
+  /// by symbols[offset + shift ... shift + numSymbols).
+  AffineMap shiftSymbols(unsigned shift, unsigned offset = 0) const {
     return AffineMap::get(getNumDims(), getNumSymbols() + shift,
                           llvm::to_vector<4>(llvm::map_range(
                               getResults(),
                               [&](AffineExpr e) {
-                                return e.shiftSymbols(getNumSymbols(), shift);
+                                return e.shiftSymbols(getNumSymbols(), shift,
+                                                      offset);
                               })),
                           getContext());
   }
@@ -490,6 +510,20 @@ AffineMap concatAffineMaps(ArrayRef<AffineMap> maps);
 AffineMap
 getProjectedMap(AffineMap map,
                 const llvm::SmallDenseSet<unsigned> &projectedDimensions);
+
+/// Apply a permutation from `map` to `source` and return the result.
+template <typename T>
+SmallVector<T> applyPermutationMap(AffineMap map, llvm::ArrayRef<T> source) {
+  assert(map.isProjectedPermutation());
+  assert(map.getNumInputs() == source.size());
+  SmallVector<T> result;
+  result.reserve(map.getNumResults());
+  for (unsigned i = 0, e = map.getNumResults(); i < e; ++i) {
+    unsigned dim = map.getDimPosition(i);
+    result.push_back(source[dim]);
+  }
+  return result;
+}
 
 inline raw_ostream &operator<<(raw_ostream &os, AffineMap map) {
   map.print(os);

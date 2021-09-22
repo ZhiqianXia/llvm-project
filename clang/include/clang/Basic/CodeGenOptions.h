@@ -125,6 +125,13 @@ public:
     All,         // Keep all frame pointers.
   };
 
+  enum class SwiftAsyncFramePointerKind {
+    Auto, // Choose Swift async extended frame info based on deployment target.
+    Always, // Unconditionally emit Swift async extended frame info.
+    Never,  // Don't emit Swift async extended frame info.
+    Default = Always,
+  };
+
   enum FiniteLoopsKind {
     Language, // Not specified, use language standard.
     Always,   // All loops are assumed to be finite.
@@ -451,6 +458,12 @@ public:
   /// Check if maybe unused type info should be emitted.
   bool hasMaybeUnusedDebugInfo() const {
     return getDebugInfo() >= codegenoptions::UnusedTypeInfo;
+  }
+
+  // Check if any one of SanitizeCoverage* is enabled.
+  bool hasSanitizeCoverage() const {
+    return SanitizeCoverageType || SanitizeCoverageIndirectCalls ||
+           SanitizeCoverageTraceCmp;
   }
 };
 

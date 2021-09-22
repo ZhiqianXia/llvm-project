@@ -48,7 +48,7 @@
 #include <cstring>
 #include <utility>
 
-#include <assert.h>
+#include <cassert>
 
 #define DEFAULT_DISASM_BYTE_SIZE 32
 
@@ -1122,6 +1122,10 @@ bool PseudoInstruction::HasDelaySlot() {
   // This is NOT a valid question for a pseudo instruction.
   return false;
 }
+
+bool PseudoInstruction::IsLoad() { return false; }
+
+bool PseudoInstruction::IsAuthenticated() { return false; }
 
 size_t PseudoInstruction::Decode(const lldb_private::Disassembler &disassembler,
                                  const lldb_private::DataExtractor &data,

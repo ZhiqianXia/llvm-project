@@ -527,6 +527,11 @@ bool TwoAddressInstructionPass::isProfitableToCommute(Register RegA,
   if (isRevCopyChain(RegB, RegA, MaxDataFlowEdge))
     return false;
 
+  // Look for other target specific commute preference.
+  bool Commute;
+  if (TII->hasCommutePreference(*MI, Commute))
+    return Commute;
+
   // Since there are no intervening uses for both registers, then commute
   // if the def of RegC is closer. Its live interval is shorter.
   return LastDefB && LastDefC && LastDefC > LastDefB;
@@ -662,8 +667,7 @@ void TwoAddressInstructionPass::scanUses(Register DstReg) {
     unsigned ToReg = VirtRegPairs.back();
     VirtRegPairs.pop_back();
     while (!VirtRegPairs.empty()) {
-      unsigned FromReg = VirtRegPairs.back();
-      VirtRegPairs.pop_back();
+      unsigned FromReg = VirtRegPairs.pop_back_val();
       bool isNew = DstRegMap.insert(std::make_pair(FromReg, ToReg)).second;
       if (!isNew)
         assert(DstRegMap[FromReg] == ToReg &&"Can't map to two dst registers!");

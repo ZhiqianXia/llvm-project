@@ -125,8 +125,13 @@ class X86PreTileConfig : public MachineFunctionPass {
 
   /// Check if it is an edge from loop bottom to loop head.
   bool isLoopBackEdge(MachineBasicBlock *Header, MachineBasicBlock *Bottom) {
-    return MLI->isLoopHeader(Header) &&
-           MLI->getLoopFor(Header)->getBottomBlock() == Bottom;
+    if (!MLI->isLoopHeader(Header))
+      return false;
+    auto *ML = MLI->getLoopFor(Header);
+    if (ML->contains(Bottom) && ML->isLoopLatch(Bottom))
+      return true;
+
+    return false;
   }
 
   /// Collect the shape def information for later use.
@@ -318,7 +323,7 @@ bool X86PreTileConfig::runOnMachineFunction(MachineFunction &MF) {
       ST.getTileConfigSize(), ST.getTileConfigAlignment(), false);
 
   // Try to insert for the tile config live in points.
-  for (auto I : CfgNeedInsert) {
+  for (const auto &I : CfgNeedInsert) {
     SmallSet<MIRef, 8> InsertPoints;
     SmallVector<MIRef, 8> WorkList({I});
     while (!WorkList.empty()) {

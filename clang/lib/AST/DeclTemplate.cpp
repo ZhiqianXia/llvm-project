@@ -74,9 +74,10 @@ TemplateParameterList::TemplateParameterList(const ASTContext& C,
             ->containsUnexpandedParameterPack())
           ContainsUnexpandedParameterPack = true;
       }
-      HasConstrainedParameters = TTP->hasTypeConstraint();
+      if (TTP->hasTypeConstraint())
+        HasConstrainedParameters = true;
     } else {
-      llvm_unreachable("unexpcted template parameter type");
+      llvm_unreachable("unexpected template parameter type");
     }
     // FIXME: If a default argument contains an unexpanded parameter pack, the
     // template parameter list does too.

@@ -239,8 +239,10 @@ bool WebAssemblyExplicitLocals::runOnMachineFunction(MachineFunction &MF) {
     Changed = true;
   }
 
-  // Start assigning local numbers after the last parameter.
+  // Start assigning local numbers after the last parameter and after any
+  // already-assigned locals.
   unsigned CurLocal = static_cast<unsigned>(MFI.getParams().size());
+  CurLocal += static_cast<unsigned>(MFI.getLocals().size());
 
   // Precompute the set of registers that are unused, so that we can insert
   // drops to their defs.
@@ -250,8 +252,7 @@ bool WebAssemblyExplicitLocals::runOnMachineFunction(MachineFunction &MF) {
 
   // Visit each instruction in the function.
   for (MachineBasicBlock &MBB : MF) {
-    for (MachineBasicBlock::iterator I = MBB.begin(), E = MBB.end(); I != E;) {
-      MachineInstr &MI = *I++;
+    for (MachineInstr &MI : llvm::make_early_inc_range(MBB)) {
       assert(!WebAssembly::isArgument(MI.getOpcode()));
 
       if (MI.isDebugInstr() || MI.isLabel())
@@ -305,11 +306,12 @@ bool WebAssemblyExplicitLocals::runOnMachineFunction(MachineFunction &MF) {
         if (!MFI.isVRegStackified(OldReg)) {
           const TargetRegisterClass *RC = MRI.getRegClass(OldReg);
           Register NewReg = MRI.createVirtualRegister(RC);
+          auto InsertPt = std::next(MI.getIterator());
           if (UseEmpty[Register::virtReg2Index(OldReg)]) {
             unsigned Opc = getDropOpcode(RC);
-            MachineInstr *Drop = BuildMI(MBB, std::next(MI.getIterator()),
-                                         MI.getDebugLoc(), TII->get(Opc))
-                                     .addReg(NewReg);
+            MachineInstr *Drop =
+                BuildMI(MBB, InsertPt, MI.getDebugLoc(), TII->get(Opc))
+                    .addReg(NewReg);
             // After the drop instruction, this reg operand will not be used
             Drop->getOperand(0).setIsKill();
             if (MFI.isFrameBaseVirtual() && OldReg == MFI.getFrameBaseVreg())
@@ -320,8 +322,7 @@ bool WebAssemblyExplicitLocals::runOnMachineFunction(MachineFunction &MF) {
 
             WebAssemblyDebugValueManager(&MI).replaceWithLocal(LocalId);
 
-            BuildMI(MBB, std::next(MI.getIterator()), MI.getDebugLoc(),
-                    TII->get(Opc))
+            BuildMI(MBB, InsertPt, MI.getDebugLoc(), TII->get(Opc))
                 .addImm(LocalId)
                 .addReg(NewReg);
           }

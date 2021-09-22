@@ -1470,9 +1470,8 @@ std::string TernOpInit::getAsString() const {
           ", " + MHS->getAsString() + ", " + RHS->getAsString() + ")");
 }
 
-static void ProfileFoldOpInit(FoldingSetNodeID &ID, Init *A, Init *B,
-                              Init *Start, Init *List, Init *Expr,
-                              RecTy *Type) {
+static void ProfileFoldOpInit(FoldingSetNodeID &ID, Init *Start, Init *List,
+                              Init *A, Init *B, Init *Expr, RecTy *Type) {
   ID.AddPointer(Start);
   ID.AddPointer(List);
   ID.AddPointer(A);
@@ -2654,7 +2653,7 @@ void Record::checkRecordAssertions() {
   RecordResolver R(*this);
   R.setFinal(true);
 
-  for (auto Assertion : getAssertions()) {
+  for (const auto &Assertion : getAssertions()) {
     Init *Condition = Assertion.Condition->resolveReferences(R);
     Init *Message = Assertion.Message->resolveReferences(R);
     CheckAssert(Assertion.Loc, Condition, Message);

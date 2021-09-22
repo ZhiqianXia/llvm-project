@@ -65,11 +65,11 @@ CGOPT(DenormalMode::DenormalModeKind, DenormalFP32Math)
 CGOPT(bool, EnableHonorSignDependentRoundingFPMath)
 CGOPT(FloatABI::ABIType, FloatABIForCalls)
 CGOPT(FPOpFusion::FPOpFusionMode, FuseFPOps)
+CGOPT(SwiftAsyncFramePointerMode, SwiftAsyncFramePointer)
 CGOPT(bool, DontPlaceZerosInBSS)
 CGOPT(bool, EnableGuaranteedTailCallOpt)
 CGOPT(bool, DisableTailCalls)
 CGOPT(bool, StackSymbolOrdering)
-CGOPT(unsigned, OverrideStackAlignment)
 CGOPT(bool, StackRealign)
 CGOPT(std::string, TrapFuncName)
 CGOPT(bool, UseCtors)
@@ -79,9 +79,6 @@ CGOPT_EXP(bool, FunctionSections)
 CGOPT(bool, IgnoreXCOFFVisibility)
 CGOPT(bool, XCOFFTracebackTable)
 CGOPT(std::string, BBSections)
-CGOPT(std::string, StackProtectorGuard)
-CGOPT(int, StackProtectorGuardOffset)
-CGOPT(std::string, StackProtectorGuardReg)
 CGOPT(unsigned, TLSSize)
 CGOPT(bool, EmulatedTLS)
 CGOPT(bool, UniqueSectionNames)
@@ -98,6 +95,7 @@ CGOPT(bool, ValueTrackingVariableLocations)
 CGOPT(bool, ForceDwarfFrameSection)
 CGOPT(bool, XRayOmitFunctionIndex)
 CGOPT(bool, DebugStrictDwarf)
+CGOPT(unsigned, AlignLoops)
 
 codegen::RegisterCodeGenFlags::RegisterCodeGenFlags() {
 #define CGBINDOPT(NAME)                                                        \
@@ -281,6 +279,18 @@ codegen::RegisterCodeGenFlags::RegisterCodeGenFlags() {
                      "Only fuse FP ops when the result won't be affected.")));
   CGBINDOPT(FuseFPOps);
 
+  static cl::opt<SwiftAsyncFramePointerMode> SwiftAsyncFramePointer(
+      "swift-async-fp",
+      cl::desc("Determine when the Swift async frame pointer should be set"),
+      cl::init(SwiftAsyncFramePointerMode::Always),
+      cl::values(clEnumValN(SwiftAsyncFramePointerMode::DeploymentBased, "auto",
+                            "Determine based on deployment target"),
+                 clEnumValN(SwiftAsyncFramePointerMode::Always, "always",
+                            "Always set the bit"),
+                 clEnumValN(SwiftAsyncFramePointerMode::Never, "never",
+                            "Never set the bit")));
+  CGBINDOPT(SwiftAsyncFramePointer);
+
   static cl::opt<bool> DontPlaceZerosInBSS(
       "nozero-initialized-in-bss",
       cl::desc("Don't place zero-initialized symbols into bss section"),
@@ -307,11 +317,6 @@ codegen::RegisterCodeGenFlags::RegisterCodeGenFlags() {
       "stack-symbol-ordering", cl::desc("Order local stack symbols."),
       cl::init(true));
   CGBINDOPT(StackSymbolOrdering);
-
-  static cl::opt<unsigned> OverrideStackAlignment(
-      "stack-alignment", cl::desc("Override default stack alignment"),
-      cl::init(0));
-  CGBINDOPT(OverrideStackAlignment);
 
   static cl::opt<bool> StackRealign(
       "stackrealign",
@@ -365,21 +370,6 @@ codegen::RegisterCodeGenFlags::RegisterCodeGenFlags() {
       cl::value_desc("all | <function list (file)> | labels | none"),
       cl::init("none"));
   CGBINDOPT(BBSections);
-
-  static cl::opt<std::string> StackProtectorGuard(
-      "stack-protector-guard", cl::desc("Stack protector guard mode"),
-      cl::init("none"));
-  CGBINDOPT(StackProtectorGuard);
-
-  static cl::opt<std::string> StackProtectorGuardReg(
-      "stack-protector-guard-reg", cl::desc("Stack protector guard register"),
-      cl::init("none"));
-  CGBINDOPT(StackProtectorGuardReg);
-
-  static cl::opt<int> StackProtectorGuardOffset(
-      "stack-protector-guard-offset", cl::desc("Stack protector guard offset"),
-      cl::init(INT_MAX));
-  CGBINDOPT(StackProtectorGuardOffset);
 
   static cl::opt<unsigned> TLSSize(
       "tls-size", cl::desc("Bit size of immediate TLS offsets"), cl::init(0));
@@ -476,6 +466,10 @@ codegen::RegisterCodeGenFlags::RegisterCodeGenFlags() {
       "strict-dwarf", cl::desc("use strict dwarf"), cl::init(false));
   CGBINDOPT(DebugStrictDwarf);
 
+  static cl::opt<unsigned> AlignLoops("align-loops",
+                                      cl::desc("Default alignment for loops"));
+  CGBINDOPT(AlignLoops);
+
 #undef CGBINDOPT
 
   mc::RegisterMCTargetOptionsFlags();
@@ -502,26 +496,6 @@ codegen::getBBSectionsMode(llvm::TargetOptions &Options) {
   }
 }
 
-llvm::StackProtectorGuards
-codegen::getStackProtectorGuardMode(llvm::TargetOptions &Options) {
-  if (getStackProtectorGuard() == "tls")
-    return StackProtectorGuards::TLS;
-  if (getStackProtectorGuard() == "global")
-    return StackProtectorGuards::Global;
-  if (getStackProtectorGuard() == "sysreg")
-    return StackProtectorGuards::SysReg;
-  if (getStackProtectorGuard() != "none") {
-    ErrorOr<std::unique_ptr<MemoryBuffer>> MBOrErr =
-        MemoryBuffer::getFile(getStackProtectorGuard());
-    if (!MBOrErr)
-      errs() << "error illegal stack protector guard mode: "
-             << MBOrErr.getError().message() << "\n";
-    else
-      Options.BBSectionsFuncListBuf = std::move(*MBOrErr);
-  }
-  return StackProtectorGuards::None;
-}
-
 // Common utility function tightly tied to the options listed here. Initializes
 // a TargetOptions object with CodeGen flags and returns it.
 TargetOptions
@@ -546,7 +520,6 @@ codegen::InitTargetOptionsFromCodeGenFlags(const Triple &TheTriple) {
   Options.EnableAIXExtendedAltivecABI = getEnableAIXExtendedAltivecABI();
   Options.NoZerosInBSS = getDontPlaceZerosInBSS();
   Options.GuaranteedTailCallOpt = getEnableGuaranteedTailCallOpt();
-  Options.StackAlignmentOverride = getOverrideStackAlignment();
   Options.StackSymbolOrdering = getStackSymbolOrdering();
   Options.UseInitArray = !getUseCtors();
   Options.RelaxELFRelocations = getRelaxELFRelocations();
@@ -558,9 +531,6 @@ codegen::InitTargetOptionsFromCodeGenFlags(const Triple &TheTriple) {
   Options.BBSections = getBBSectionsMode(Options);
   Options.UniqueSectionNames = getUniqueSectionNames();
   Options.UniqueBasicBlockSectionNames = getUniqueBasicBlockSectionNames();
-  Options.StackProtectorGuard = getStackProtectorGuardMode(Options);
-  Options.StackProtectorGuardOffset = getStackProtectorGuardOffset();
-  Options.StackProtectorGuardReg = getStackProtectorGuardReg();
   Options.TLSSize = getTLSSize();
   Options.EmulatedTLS = getEmulatedTLS();
   Options.ExplicitEmulatedTLS = EmulatedTLSView->getNumOccurrences() > 0;
@@ -575,13 +545,14 @@ codegen::InitTargetOptionsFromCodeGenFlags(const Triple &TheTriple) {
   Options.ForceDwarfFrameSection = getForceDwarfFrameSection();
   Options.XRayOmitFunctionIndex = getXRayOmitFunctionIndex();
   Options.DebugStrictDwarf = getDebugStrictDwarf();
+  Options.LoopAlignment = getAlignLoops();
 
   Options.MCOptions = mc::InitMCTargetOptionsFromFlags();
 
   Options.ThreadModel = getThreadModel();
   Options.EABIVersion = getEABIVersion();
   Options.DebuggerTuning = getDebuggerTuningOpt();
-
+  Options.SwiftAsyncFramePointer = getSwiftAsyncFramePointer();
   return Options;
 }
 
@@ -714,13 +685,11 @@ void codegen::setFunctionAttributes(StringRef CPU, StringRef Features,
           if (const auto *F = Call->getCalledFunction())
             if (F->getIntrinsicID() == Intrinsic::debugtrap ||
                 F->getIntrinsicID() == Intrinsic::trap)
-              Call->addAttribute(
-                  AttributeList::FunctionIndex,
+              Call->addFnAttr(
                   Attribute::get(Ctx, "trap-func-name", getTrapFuncName()));
 
   // Let NewAttrs override Attrs.
-  F.setAttributes(
-      Attrs.addAttributes(Ctx, AttributeList::FunctionIndex, NewAttrs));
+  F.setAttributes(Attrs.addFnAttributes(Ctx, NewAttrs));
 }
 
 /// Set function attributes of functions in Module M based on CPU,

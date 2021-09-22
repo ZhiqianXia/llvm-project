@@ -108,8 +108,29 @@ struct SimpleValue {
 
   static bool canHandle(Instruction *Inst) {
     // This can only handle non-void readnone functions.
-    if (CallInst *CI = dyn_cast<CallInst>(Inst))
+    // Also handled are constrained intrinsic that look like the types
+    // of instruction handled below (UnaryOperator, etc.).
+    if (CallInst *CI = dyn_cast<CallInst>(Inst)) {
+      if (Function *F = CI->getCalledFunction()) {
+        switch ((Intrinsic::ID)F->getIntrinsicID()) {
+        case Intrinsic::experimental_constrained_fadd:
+        case Intrinsic::experimental_constrained_fsub:
+        case Intrinsic::experimental_constrained_fmul:
+        case Intrinsic::experimental_constrained_fdiv:
+        case Intrinsic::experimental_constrained_frem:
+        case Intrinsic::experimental_constrained_fptosi:
+        case Intrinsic::experimental_constrained_sitofp:
+        case Intrinsic::experimental_constrained_fptoui:
+        case Intrinsic::experimental_constrained_uitofp:
+        case Intrinsic::experimental_constrained_fcmp:
+        case Intrinsic::experimental_constrained_fcmps: {
+          auto *CFP = cast<ConstrainedFPIntrinsic>(CI);
+          return CFP->isDefaultFPEnvironment();
+        }
+        }
+      }
       return CI->doesNotAccessMemory() && !CI->getType()->isVoidTy();
+    }
     return isa<CastInst>(Inst) || isa<UnaryOperator>(Inst) ||
            isa<BinaryOperator>(Inst) || isa<GetElementPtrInst>(Inst) ||
            isa<CmpInst>(Inst) || isa<SelectInst>(Inst) ||
@@ -1619,6 +1640,16 @@ PreservedAnalyses EarlyCSEPass::run(Function &F,
   if (UseMemorySSA)
     PA.preserve<MemorySSAAnalysis>();
   return PA;
+}
+
+void EarlyCSEPass::printPipeline(
+    raw_ostream &OS, function_ref<StringRef(StringRef)> MapClassName2PassName) {
+  static_cast<PassInfoMixin<EarlyCSEPass> *>(this)->printPipeline(
+      OS, MapClassName2PassName);
+  OS << "<";
+  if (UseMemorySSA)
+    OS << "memssa";
+  OS << ">";
 }
 
 namespace {

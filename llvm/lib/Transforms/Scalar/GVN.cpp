@@ -82,7 +82,6 @@
 #include <cassert>
 #include <cstdint>
 #include <utility>
-#include <vector>
 
 using namespace llvm;
 using namespace llvm::gvn;
@@ -685,6 +684,24 @@ PreservedAnalyses GVN::run(Function &F, FunctionAnalysisManager &AM) {
   return PA;
 }
 
+void GVN::printPipeline(
+    raw_ostream &OS, function_ref<StringRef(StringRef)> MapClassName2PassName) {
+  static_cast<PassInfoMixin<GVN> *>(this)->printPipeline(OS,
+                                                         MapClassName2PassName);
+
+  OS << "<";
+  if (Options.AllowPRE != None)
+    OS << (Options.AllowPRE.getValue() ? "" : "no-") << "pre;";
+  if (Options.AllowLoadPRE != None)
+    OS << (Options.AllowLoadPRE.getValue() ? "" : "no-") << "load-pre;";
+  if (Options.AllowLoadPRESplitBackedge != None)
+    OS << (Options.AllowLoadPRESplitBackedge.getValue() ? "" : "no-")
+       << "split-backedge-load-pre;";
+  if (Options.AllowMemDep != None)
+    OS << (Options.AllowMemDep.getValue() ? "" : "no-") << "memdep";
+  OS << ">";
+}
+
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void GVN::dump(DenseMap<uint32_t, Value*>& d) const {
   errs() << "{\n";
@@ -894,17 +911,17 @@ Value *AvailableValue::MaterializeAdjustedValue(LoadInst *Load,
                         << "\n\n\n");
     }
   } else if (isCoercedLoadValue()) {
-    LoadInst *Load = getCoercedLoadValue();
-    if (Load->getType() == LoadTy && Offset == 0) {
-      Res = Load;
+    LoadInst *CoercedLoad = getCoercedLoadValue();
+    if (CoercedLoad->getType() == LoadTy && Offset == 0) {
+      Res = CoercedLoad;
     } else {
-      Res = getLoadValueForLoad(Load, Offset, LoadTy, InsertPt, DL);
+      Res = getLoadValueForLoad(CoercedLoad, Offset, LoadTy, InsertPt, DL);
       // We would like to use gvn.markInstructionForDeletion here, but we can't
       // because the load is already memoized into the leader map table that GVN
       // tracks.  It is potentially possible to remove the load from the table,
       // but then there all of the operations based on it would need to be
       // rehashed.  Just leave the dead load around.
-      gvn.getMemDep().removeInstruction(Load);
+      gvn.getMemDep().removeInstruction(CoercedLoad);
       LLVM_DEBUG(dbgs() << "GVN COERCED NONLOCAL LOAD:\nOffset: " << Offset
                         << "  " << *getCoercedLoadValue() << '\n'
                         << *Res << '\n'
@@ -1213,8 +1230,7 @@ void GVN::eliminatePartiallyRedundantLoad(
     }
 
     // Transfer the old load's AA tags to the new load.
-    AAMDNodes Tags;
-    Load->getAAMetadata(Tags);
+    AAMDNodes Tags = Load->getAAMetadata();
     if (Tags)
       NewLoad->setAAMetadata(Tags);
 
@@ -1674,8 +1690,11 @@ bool GVN::processNonLocalLoad(LoadInst *Load) {
   if (!isLoadInLoopPREEnabled() && LI && LI->getLoopFor(Load->getParent()))
     return Changed;
 
-  return Changed || PerformLoadPRE(Load, ValuesPerBlock, UnavailableBlocks) ||
-         performLoopLoadPRE(Load, ValuesPerBlock, UnavailableBlocks);
+  if (performLoopLoadPRE(Load, ValuesPerBlock, UnavailableBlocks) ||
+      PerformLoadPRE(Load, ValuesPerBlock, UnavailableBlocks))
+    return true;
+
+  return Changed;
 }
 
 static bool impliesEquivalanceIfTrue(CmpInst* Cmp) {
@@ -2458,10 +2477,8 @@ bool GVN::runImpl(Function &F, AssumptionCache &RunAC, DominatorTree &RunDT,
   DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
   // Merge unconditional branches, allowing PRE to catch more
   // optimization opportunities.
-  for (Function::iterator FI = F.begin(), FE = F.end(); FI != FE; ) {
-    BasicBlock *BB = &*FI++;
-
-    bool removedBlock = MergeBlockIntoPredecessor(BB, &DTU, LI, MSSAU, MD);
+  for (BasicBlock &BB : llvm::make_early_inc_range(F)) {
+    bool removedBlock = MergeBlockIntoPredecessor(&BB, &DTU, LI, MSSAU, MD);
     if (removedBlock)
       ++NumGVNBlocks;
 

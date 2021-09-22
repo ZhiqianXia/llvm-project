@@ -287,9 +287,23 @@ bool AffineMap::isSingleConstant() const {
   return getNumResults() == 1 && getResult(0).isa<AffineConstantExpr>();
 }
 
+bool AffineMap::isConstant() const {
+  return llvm::all_of(getResults(), [](AffineExpr expr) {
+    return expr.isa<AffineConstantExpr>();
+  });
+}
+
 int64_t AffineMap::getSingleConstantResult() const {
   assert(isSingleConstant() && "map must have a single constant result");
   return getResult(0).cast<AffineConstantExpr>().getValue();
+}
+
+SmallVector<int64_t> AffineMap::getConstantResults() const {
+  assert(isConstant() && "map must have only constant results");
+  SmallVector<int64_t> result;
+  for (auto expr : getResults())
+    result.emplace_back(expr.cast<AffineConstantExpr>().getValue());
+  return result;
 }
 
 unsigned AffineMap::getNumDims() const {
@@ -320,6 +334,14 @@ AffineExpr AffineMap::getResult(unsigned idx) const {
 
 unsigned AffineMap::getDimPosition(unsigned idx) const {
   return getResult(idx).cast<AffineDimExpr>().getPosition();
+}
+
+unsigned AffineMap::getPermutedPosition(unsigned input) const {
+  assert(isPermutation() && "invalid permutation request");
+  for (unsigned i = 0, numResults = getNumResults(); i < numResults; i++)
+    if (getDimPosition(i) == input)
+      return i;
+  llvm_unreachable("incorrect permutation request");
 }
 
 /// Folds the results of the application of an affine map on the provided
@@ -423,6 +445,15 @@ AffineMap AffineMap::replace(const DenseMap<AffineExpr, AffineExpr> &map,
   for (AffineExpr e : getResults())
     newResults.push_back(e.replace(map));
   return AffineMap::get(numResultDims, numResultSyms, newResults, getContext());
+}
+
+AffineMap
+AffineMap::replace(const DenseMap<AffineExpr, AffineExpr> &map) const {
+  SmallVector<AffineExpr, 4> newResults;
+  newResults.reserve(getNumResults());
+  for (AffineExpr e : getResults())
+    newResults.push_back(e.replace(map));
+  return AffineMap::inferFromExprList(newResults).front();
 }
 
 AffineMap AffineMap::compose(AffineMap map) const {

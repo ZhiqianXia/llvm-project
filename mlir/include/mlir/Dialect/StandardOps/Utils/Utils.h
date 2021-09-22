@@ -72,6 +72,28 @@ public:
   }
 };
 
+/// Converts an OpFoldResult to a Value. Returns the fold result if it casts to
+/// a Value or creates a ConstantIndexOp if it casts to an IntegerAttribute.
+/// Other attribute types are not supported.
+Value getValueOrCreateConstantIndexOp(OpBuilder &b, Location loc,
+                                      OpFoldResult ofr);
+
+/// Helper struct to build simple arithmetic quantities with minimal type
+/// inference support.
+struct ArithBuilder {
+  ArithBuilder(OpBuilder &b, Location loc) : b(b), loc(loc) {}
+
+  Value _and(Value lhs, Value rhs);
+  Value add(Value lhs, Value rhs);
+  Value mul(Value lhs, Value rhs);
+  Value select(Value cmp, Value lhs, Value rhs);
+  Value sgt(Value lhs, Value rhs);
+  Value slt(Value lhs, Value rhs);
+
+private:
+  OpBuilder &b;
+  Location loc;
+};
 } // end namespace mlir
 
 #endif // MLIR_DIALECT_STANDARDOPS_UTILS_UTILS_H

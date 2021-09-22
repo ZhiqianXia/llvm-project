@@ -168,7 +168,7 @@ static void DefineTypeSize(const Twine &MacroName, unsigned TypeWidth,
                            MacroBuilder &Builder) {
   llvm::APInt MaxVal = isSigned ? llvm::APInt::getSignedMaxValue(TypeWidth)
                                 : llvm::APInt::getMaxValue(TypeWidth);
-  Builder.defineMacro(MacroName, MaxVal.toString(10, isSigned) + ValSuffix);
+  Builder.defineMacro(MacroName, toString(MaxVal, 10, isSigned) + ValSuffix);
 }
 
 /// DefineTypeSize - An overloaded helper that uses TargetInfo to determine
@@ -433,11 +433,18 @@ static void InitializeStandardPredefinedMacros(const TargetInfo &TI,
   // OpenCL v1.0/1.1 s6.9, v1.2/2.0 s6.10: Preprocessor Directives and Macros.
   if (LangOpts.OpenCL) {
     if (LangOpts.CPlusPlus) {
-      if (LangOpts.OpenCLCPlusPlusVersion == 100)
+      switch (LangOpts.OpenCLCPlusPlusVersion) {
+      case 100:
         Builder.defineMacro("__OPENCL_CPP_VERSION__", "100");
-      else
+        break;
+      case 202100:
+        Builder.defineMacro("__OPENCL_CPP_VERSION__", "202100");
+        break;
+      default:
         llvm_unreachable("Unsupported C++ version for OpenCL");
+      }
       Builder.defineMacro("__CL_CPP_VERSION_1_0__", "100");
+      Builder.defineMacro("__CL_CPP_VERSION_2021__", "202100");
     } else {
       // OpenCL v1.0 and v1.1 do not have a predefined macro to indicate the
       // language standard with which the program is compiled. __OPENCL_VERSION__
@@ -594,11 +601,13 @@ static void InitializeCPlusPlusFeatureTestMacros(const LangOptions &LangOpts,
     Builder.defineMacro("__cpp_designated_initializers", "201707L");
     Builder.defineMacro("__cpp_impl_three_way_comparison", "201907L");
     //Builder.defineMacro("__cpp_modules", "201907L");
-    //Builder.defineMacro("__cpp_using_enum", "201907L");
+    Builder.defineMacro("__cpp_using_enum", "201907L");
   }
   // C++2b features.
-  if (LangOpts.CPlusPlus2b)
+  if (LangOpts.CPlusPlus2b) {
+    Builder.defineMacro("__cpp_implicit_move", "202011L");
     Builder.defineMacro("__cpp_size_t_suffix", "202011L");
+  }
   if (LangOpts.Char8)
     Builder.defineMacro("__cpp_char8_t", "201811L");
   Builder.defineMacro("__cpp_impl_destroying_delete", "201806L");
