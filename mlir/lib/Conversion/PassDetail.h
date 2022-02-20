@@ -11,6 +11,8 @@
 
 #include "mlir/Pass/Pass.h"
 
+#include "mlir/Conversion/GPUToROCDL/Runtimes.h"
+
 namespace mlir {
 class AffineDialect;
 class StandardOpsDialect;
@@ -26,6 +28,10 @@ class OpenACCDialect;
 namespace arith {
 class ArithmeticDialect;
 } // namespace arith
+
+namespace cf {
+class ControlFlowDialect;
+} // namespace cf
 
 namespace complex {
 class ComplexDialect;

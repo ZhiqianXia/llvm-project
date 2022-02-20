@@ -14,8 +14,9 @@
 #include "sanitizer_allocator_interface.h"
 #include "sanitizer_common.h"
 #include "sanitizer_flags.h"
+#include "sanitizer_interface_internal.h"
 #include "sanitizer_procmaps.h"
-
+#include "sanitizer_stackdepot.h"
 
 namespace __sanitizer {
 
@@ -96,7 +97,7 @@ void MaybeStartBackgroudThread() {
   }
 }
 
-#  ifndef START_BACKGROUND_THREAD_EARLY
+#  if !SANITIZER_START_BACKGROUND_THREAD_IN_ASAN_INTERNAL
 #    pragma clang diagnostic push
 // We avoid global-constructors to be sure that globals are ready when
 // sanitizers need them. This can happend before global constructors executed.
@@ -107,6 +108,8 @@ static struct BackgroudThreadStarted {
 } background_thread_strarter UNUSED;
 #    pragma clang diagnostic pop
 #  endif
+#else
+void MaybeStartBackgroudThread() {}
 #endif
 
 void WriteToSyslog(const char *msg) {
@@ -197,10 +200,22 @@ void ProtectGap(uptr addr, uptr size, uptr zero_base_shadow_start,
 
 #endif  // !SANITIZER_FUCHSIA
 
+#if !SANITIZER_WINDOWS && !SANITIZER_GO
+// Weak default implementation for when sanitizer_stackdepot is not linked in.
+SANITIZER_WEAK_ATTRIBUTE void StackDepotStopBackgroundThread() {}
+static void StopStackDepotBackgroundThread() {
+  StackDepotStopBackgroundThread();
+}
+#else
+// SANITIZER_WEAK_ATTRIBUTE is unsupported.
+static void StopStackDepotBackgroundThread() {}
+#endif
+
 }  // namespace __sanitizer
 
 SANITIZER_INTERFACE_WEAK_DEF(void, __sanitizer_sandbox_on_notify,
                              __sanitizer_sandbox_arguments *args) {
+  __sanitizer::StopStackDepotBackgroundThread();
   __sanitizer::PlatformPrepareForSandboxing(args);
   if (__sanitizer::sandboxing_callback)
     __sanitizer::sandboxing_callback();

@@ -914,7 +914,7 @@ class Foo {})cpp";
        [](HoverInfo &HI) {
          HI.Name = "arr";
          HI.Kind = index::SymbolKind::Variable;
-         HI.Type = "m_int[Size]";
+         HI.Type = {"m_int[Size]", "int[Size]"};
          HI.NamespaceScope = "";
          HI.Definition = "template <int Size> m_int arr[Size]";
          HI.TemplateParameters = {{{"int"}, {"Size"}, llvm::None}};
@@ -930,7 +930,7 @@ class Foo {})cpp";
        [](HoverInfo &HI) {
          HI.Name = "arr<4>";
          HI.Kind = index::SymbolKind::Variable;
-         HI.Type = "m_int[4]";
+         HI.Type = {"m_int[4]", "int[4]"};
          HI.NamespaceScope = "";
          HI.Definition = "m_int arr[4]";
        }},
@@ -998,6 +998,52 @@ class Foo {})cpp";
          HI.Definition = "template <typename T> using AA = A<T>";
          HI.Type = {"A<T>", "type-parameter-0-0"}; // FIXME: should be 'T'
          HI.TemplateParameters = {{{"typename"}, std::string("T"), llvm::None}};
+       }},
+      {// Constant array
+       R"cpp(
+          using m_int = int;
+
+          m_int ^[[arr]][10];
+         )cpp",
+       [](HoverInfo &HI) {
+         HI.Name = "arr";
+         HI.NamespaceScope = "";
+         HI.LocalScope = "";
+         HI.Kind = index::SymbolKind::Variable;
+         HI.Definition = "m_int arr[10]";
+         HI.Type = {"m_int[10]", "int[10]"};
+       }},
+      {// Incomplete array
+       R"cpp(
+          using m_int = int;
+
+          extern m_int ^[[arr]][];
+         )cpp",
+       [](HoverInfo &HI) {
+         HI.Name = "arr";
+         HI.NamespaceScope = "";
+         HI.LocalScope = "";
+         HI.Kind = index::SymbolKind::Variable;
+         HI.Definition = "extern m_int arr[]";
+         HI.Type = {"m_int[]", "int[]"};
+       }},
+      {// Dependent size array
+       R"cpp(
+          using m_int = int;
+
+          template<int Size>
+          struct Test {
+            m_int ^[[arr]][Size];
+          };
+         )cpp",
+       [](HoverInfo &HI) {
+         HI.Name = "arr";
+         HI.NamespaceScope = "";
+         HI.LocalScope = "Test<Size>::";
+         HI.AccessSpecifier = "public";
+         HI.Kind = index::SymbolKind::Field;
+         HI.Definition = "m_int arr[Size]";
+         HI.Type = {"m_int[Size]", "int[Size]"};
        }}};
   for (const auto &Case : Cases) {
     SCOPED_TRACE(Case.Code);
@@ -1178,7 +1224,6 @@ TEST(Hover, NoHover) {
           )cpp",
       // literals
       "auto x = t^rue;",
-      "auto x = '^A';",
       "auto x = ^(int){42};",
       "auto x = ^42.;",
       "auto x = ^42.0i;",
@@ -1204,6 +1249,12 @@ TEST(Hover, All) {
     const char *const Code;
     const std::function<void(HoverInfo &)> ExpectedBuilder;
   } Cases[] = {
+      {"auto x = [['^A']]; // character literal",
+       [](HoverInfo &HI) {
+         HI.Name = "expression";
+         HI.Type = "char";
+         HI.Value = "65 (0x41)";
+       }},
       {
           R"cpp(// Local variable
             int main() {
@@ -2471,6 +2522,22 @@ TEST(Hover, All) {
             HI.Definition = "@property(nonatomic, assign, unsafe_unretained, "
                             "readwrite) int prop1;";
           }},
+      {
+          R"cpp(
+          @protocol MYProtocol
+          @end
+          @interface MYObject
+          @end
+
+          @interface MYObject (Ext) <[[MYProt^ocol]]>
+          @end
+          )cpp",
+          [](HoverInfo &HI) {
+            HI.Name = "MYProtocol";
+            HI.Kind = index::SymbolKind::Protocol;
+            HI.NamespaceScope = "";
+            HI.Definition = "@protocol MYProtocol\n@end";
+          }},
       {R"objc(
         @interface Foo
         @end
@@ -2649,7 +2716,7 @@ TEST(Hover, DocsFromMostSpecial) {
 
   TestTU TU = TestTU::withCode(T.code());
   auto AST = TU.build();
-  for (auto Comment : {"doc1", "doc2", "doc3"}) {
+  for (const auto *Comment : {"doc1", "doc2", "doc3"}) {
     for (const auto &P : T.points(Comment)) {
       auto H = getHover(AST, P, format::getLLVMStyle(), nullptr);
       ASSERT_TRUE(H);
@@ -3126,6 +3193,20 @@ TEST(Hover, DisableShowAKA) {
   EXPECT_EQ(H->Type, HoverInfo::PrintedType("m_int"));
 }
 
+TEST(Hover, HideBigInitializers) {
+  Annotations T(R"cpp(
+  #define A(x) x, x, x, x
+  #define B(x) A(A(A(A(x))))
+  int a^rr[] = {B(0)};
+  )cpp");
+
+  TestTU TU = TestTU::withCode(T.code());
+  auto AST = TU.build();
+  auto H = getHover(AST, T.point(), format::getLLVMStyle(), nullptr);
+
+  ASSERT_TRUE(H);
+  EXPECT_EQ(H->Definition, "int arr[]");
+}
 } // namespace
 } // namespace clangd
 } // namespace clang

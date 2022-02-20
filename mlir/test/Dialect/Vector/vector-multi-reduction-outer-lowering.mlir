@@ -153,3 +153,20 @@ func @vector_reduction_outer(%arg0: vector<2x3x4x5xi32>) -> vector<2x3xi32> {
 //       CHECK:   %[[R18:.+]] = arith.addi %[[V19]], %[[R17]] : vector<6xi32>
 //       CHECK:   %[[RESULT_VEC:.+]] = vector.shape_cast %[[R18]] : vector<6xi32> to vector<2x3xi32>
 //       CHECK:   return %[[RESULT_VEC]] : vector<2x3xi32>
+
+// This test is mainly to catch a bug that running
+// `InnerOuterDimReductionConversion` on this function results in an
+// infinite loop. So just check that some value is returned.
+func @vector_reduction_1D(%arg0 : vector<2xf32>) -> f32 {
+  %0 = vector.multi_reduction #vector.kind<maxf>, %arg0 [0] : vector<2xf32> to f32
+  return %0 : f32
+}
+// CHECK-LABEL: func @vector_reduction_1D
+//       CHECK:   return %{{.+}}
+
+func @vector_multi_reduction_to_scalar(%arg0: vector<2x3xf32>) -> f32 {
+  %0 = vector.multi_reduction <add>, %arg0 [0, 1] : vector<2x3xf32> to f32
+  return %0 : f32
+}
+// CHECK-LABEL: func @vector_multi_reduction_to_scalar
+//       CHECK:   return %{{.+}}
