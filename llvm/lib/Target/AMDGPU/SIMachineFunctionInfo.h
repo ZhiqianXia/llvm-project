@@ -421,7 +421,6 @@ private:
   // Pointer to where the ABI inserts special kernel arguments separate from the
   // user arguments. This is an offset from the KernargSegmentPtr.
   bool ImplicitArgPtr : 1;
-  bool HostcallPtr : 1;
 
   bool MayNeedAGPRs : 1;
 
@@ -526,13 +525,6 @@ public:
   }
 
   ArrayRef<SGPRSpillVGPR> getSGPRSpillVGPRs() const { return SpillVGPRs; }
-
-  void setSGPRSpillVGPRs(Register NewVGPR, Optional<int> newFI, int Index) {
-    SpillVGPRs[Index].VGPR = NewVGPR;
-    SpillVGPRs[Index].FI = newFI;
-  }
-
-  bool removeVGPRForSGPRSpill(Register ReservedVGPR, MachineFunction &MF);
 
   ArrayRef<MCPhysReg> getAGPRSpillVGPRs() const {
     return SpillAGPR;
@@ -695,10 +687,6 @@ public:
 
   bool hasImplicitArgPtr() const {
     return ImplicitArgPtr;
-  }
-
-  bool hasHostcallPtr() const {
-    return HostcallPtr;
   }
 
   bool hasImplicitBufferPtr() const {

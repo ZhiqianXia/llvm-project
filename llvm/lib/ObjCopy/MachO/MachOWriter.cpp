@@ -8,7 +8,7 @@
 
 #include "MachOWriter.h"
 #include "MachOLayoutBuilder.h"
-#include "Object.h"
+#include "MachOObject.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/Object/MachO.h"
@@ -94,64 +94,18 @@ size_t MachOWriter::totalSize() const {
                      sizeof(uint32_t) * O.IndirectSymTable.Symbols.size());
   }
 
-  if (O.CodeSignatureCommandIndex) {
-    const MachO::linkedit_data_command &LinkEditDataCommand =
-        O.LoadCommands[*O.CodeSignatureCommandIndex]
-            .MachOLoadCommand.linkedit_data_command_data;
-    if (LinkEditDataCommand.dataoff)
-      Ends.push_back(LinkEditDataCommand.dataoff +
-                     LinkEditDataCommand.datasize);
-  }
-
-  if (O.DataInCodeCommandIndex) {
-    const MachO::linkedit_data_command &LinkEditDataCommand =
-        O.LoadCommands[*O.DataInCodeCommandIndex]
-            .MachOLoadCommand.linkedit_data_command_data;
-
-    if (LinkEditDataCommand.dataoff)
-      Ends.push_back(LinkEditDataCommand.dataoff +
-                     LinkEditDataCommand.datasize);
-  }
-
-  if (O.LinkerOptimizationHintCommandIndex) {
-    const MachO::linkedit_data_command &LinkEditDataCommand =
-        O.LoadCommands[*O.LinkerOptimizationHintCommandIndex]
-            .MachOLoadCommand.linkedit_data_command_data;
-
-    if (LinkEditDataCommand.dataoff)
-      Ends.push_back(LinkEditDataCommand.dataoff +
-                     LinkEditDataCommand.datasize);
-  }
-
-  if (O.FunctionStartsCommandIndex) {
-    const MachO::linkedit_data_command &LinkEditDataCommand =
-        O.LoadCommands[*O.FunctionStartsCommandIndex]
-            .MachOLoadCommand.linkedit_data_command_data;
-
-    if (LinkEditDataCommand.dataoff)
-      Ends.push_back(LinkEditDataCommand.dataoff +
-                     LinkEditDataCommand.datasize);
-  }
-
-  if (O.ChainedFixupsCommandIndex) {
-    const MachO::linkedit_data_command &LinkEditDataCommand =
-        O.LoadCommands[*O.ChainedFixupsCommandIndex]
-            .MachOLoadCommand.linkedit_data_command_data;
-
-    if (LinkEditDataCommand.dataoff)
-      Ends.push_back(LinkEditDataCommand.dataoff +
-                     LinkEditDataCommand.datasize);
-  }
-
-  if (O.ExportsTrieCommandIndex) {
-    const MachO::linkedit_data_command &LinkEditDataCommand =
-        O.LoadCommands[*O.ExportsTrieCommandIndex]
-            .MachOLoadCommand.linkedit_data_command_data;
-
-    if (LinkEditDataCommand.dataoff)
-      Ends.push_back(LinkEditDataCommand.dataoff +
-                     LinkEditDataCommand.datasize);
-  }
+  for (Optional<size_t> LinkEditDataCommandIndex :
+       {O.CodeSignatureCommandIndex, O.DataInCodeCommandIndex,
+        O.LinkerOptimizationHintCommandIndex, O.FunctionStartsCommandIndex,
+        O.ChainedFixupsCommandIndex, O.ExportsTrieCommandIndex})
+    if (LinkEditDataCommandIndex) {
+      const MachO::linkedit_data_command &LinkEditDataCommand =
+          O.LoadCommands[*LinkEditDataCommandIndex]
+              .MachOLoadCommand.linkedit_data_command_data;
+      if (LinkEditDataCommand.dataoff)
+        Ends.push_back(LinkEditDataCommand.dataoff +
+                       LinkEditDataCommand.datasize);
+    }
 
   // Otherwise, use the last section / reloction.
   for (const LoadCommand &LC : O.LoadCommands)
@@ -570,7 +524,7 @@ void MachOWriter::writeCodeSignatureData() {
                              static_cast<ssize_t>(CodeSignature.BlockSize)));
     SHA256 Hasher;
     Hasher.update(Block);
-    StringRef Hash = Hasher.final();
+    std::array<uint8_t, 32> Hash = Hasher.final();
     assert(Hash.size() == CodeSignature.HashSize);
     memcpy(CurrHashWritePosition, Hash.data(), CodeSignature.HashSize);
     CurrHashReadPosition += CodeSignature.BlockSize;

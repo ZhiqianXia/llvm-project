@@ -8,32 +8,26 @@
 
 #include "SymbolCollector.h"
 #include "AST.h"
-#include "CanonicalIncludes.h"
 #include "CodeComplete.h"
 #include "CodeCompletionStrings.h"
 #include "ExpectedTypes.h"
 #include "SourceCode.h"
-#include "SymbolLocation.h"
 #include "URI.h"
+#include "index/CanonicalIncludes.h"
 #include "index/Relation.h"
 #include "index/SymbolID.h"
-#include "support/Logger.h"
+#include "index/SymbolLocation.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclBase.h"
-#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
-#include "clang/Basic/Specifiers.h"
 #include "clang/Index/IndexSymbol.h"
-#include "clang/Index/IndexingAction.h"
-#include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Tooling/Syntax/Tokens.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 
 namespace clang {
@@ -387,7 +381,8 @@ private:
     // If a file is mapped by canonical headers, use that mapping, regardless
     // of whether it's an otherwise-good header (header guards etc).
     if (Includes) {
-      llvm::StringRef Canonical = Includes->mapHeader(Filename);
+      llvm::StringRef Canonical =
+          Includes->mapHeader(*SM.getFileEntryRefForID(FID));
       if (!Canonical.empty()) {
         // If we had a mapping, always use it.
         if (Canonical.startswith("<") || Canonical.startswith("\""))
@@ -567,7 +562,7 @@ bool SymbolCollector::handleDeclOccurrence(
   // it's main-file only.
   bool IsMainFileOnly =
       SM.isWrittenInMainFile(SM.getExpansionLoc(ND->getBeginLoc())) &&
-      !isHeaderFile(SM.getFileEntryForID(SM.getMainFileID())->getName(),
+      !isHeaderFile(SM.getFileEntryRefForID(SM.getMainFileID())->getName(),
                     ASTCtx->getLangOpts());
   // In C, printf is a redecl of an implicit builtin! So check OrigD instead.
   if (ASTNode.OrigD->isImplicit() ||
@@ -694,7 +689,7 @@ bool SymbolCollector::handleMacroOccurrence(const IdentifierInfo *Name,
   auto SpellingLoc = SM.getSpellingLoc(Loc);
   bool IsMainFileOnly =
       SM.isInMainFile(SM.getExpansionLoc(DefLoc)) &&
-      !isHeaderFile(SM.getFileEntryForID(SM.getMainFileID())->getName(),
+      !isHeaderFile(SM.getFileEntryRefForID(SM.getMainFileID())->getName(),
                     ASTCtx->getLangOpts());
   // Do not store references to main-file macros.
   if ((static_cast<unsigned>(Opts.RefFilter) & Roles) && !IsMainFileOnly &&

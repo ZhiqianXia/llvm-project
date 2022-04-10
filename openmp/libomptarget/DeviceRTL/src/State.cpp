@@ -138,7 +138,7 @@ void *SharedMemorySmartStackTy::push(uint64_t Bytes) {
 
   if (config::isDebugMode(config::DebugKind::CommonIssues))
     PRINT("Shared memory stack full, fallback to dynamic allocation of global "
-          "memory will negatively impact performance.");
+          "memory will negatively impact performance.\n");
   void *GlobalMemory = memory::allocGlobal(
       AlignedBytes, "Slow path shared memory allocation, insufficient "
                     "shared memory stack memory!");
@@ -529,6 +529,10 @@ __attribute__((noinline)) void __kmpc_free_shared(void *Ptr, uint64_t Bytes) {
 }
 
 void *__kmpc_get_dynamic_shared() { return memory::getDynamicBuffer(); }
+
+void *llvm_omp_target_dynamic_shared_alloc() {
+  return __kmpc_get_dynamic_shared();
+}
 
 void *llvm_omp_get_dynamic_shared() { return __kmpc_get_dynamic_shared(); }
 

@@ -194,6 +194,7 @@ GCNSubtarget::GCNSubtarget(const Triple &TT, StringRef GPU, StringRef FS,
 
     FlatForGlobal(false),
     AutoWaitcntBeforeBarrier(false),
+    BackOffBarrier(false),
     UnalignedScratchAccess(false),
     UnalignedAccessMode(false),
 
@@ -216,6 +217,7 @@ GCNSubtarget::GCNSubtarget(const Triple &TT, StringRef GPU, StringRef FS,
     GFX8Insts(false),
     GFX9Insts(false),
     GFX90AInsts(false),
+    GFX940Insts(false),
     GFX10Insts(false),
     GFX10_3Insts(false),
     GFX7GFX8GFX9Insts(false),
@@ -238,6 +240,7 @@ GCNSubtarget::GCNSubtarget(const Triple &TT, StringRef GPU, StringRef FS,
     HasDPP8(false),
     Has64BitDPP(false),
     HasPackedFP32Ops(false),
+    HasImageInsts(false),
     HasExtendedImageInsts(false),
     HasR128A16(false),
     HasGFX10A16(false),
@@ -649,7 +652,8 @@ unsigned AMDGPUSubtarget::getImplicitArgNumBytes(const Function &F) const {
     return 16;
 
   // Assume all implicit inputs are used by default
-  return AMDGPU::getIntegerAttribute(F, "amdgpu-implicitarg-num-bytes", 56);
+  unsigned NBytes = (AMDGPU::getAmdhsaCodeObjectVersion() >= 5) ? 256 : 56;
+  return AMDGPU::getIntegerAttribute(F, "amdgpu-implicitarg-num-bytes", NBytes);
 }
 
 uint64_t AMDGPUSubtarget::getExplicitKernArgSize(const Function &F,

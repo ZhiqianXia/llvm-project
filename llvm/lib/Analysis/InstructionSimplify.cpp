@@ -20,7 +20,6 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/AssumptionCache.h"
@@ -36,13 +35,10 @@
 #include "llvm/IR/ConstantRange.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Dominators.h"
-#include "llvm/IR/GetElementPtrTypeIterator.h"
-#include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/PatternMatch.h"
-#include "llvm/IR/ValueHandle.h"
 #include "llvm/Support/KnownBits.h"
 #include <algorithm>
 using namespace llvm;
@@ -1807,6 +1803,27 @@ static Value *simplifyAndOrOfICmpsWithLimitConst(ICmpInst *Cmp0, ICmpInst *Cmp1,
   return nullptr;
 }
 
+/// Try to simplify and/or of icmp with ctpop intrinsic.
+static Value *simplifyAndOrOfICmpsWithCtpop(ICmpInst *Cmp0, ICmpInst *Cmp1,
+                                            bool IsAnd) {
+  ICmpInst::Predicate Pred0, Pred1;
+  Value *X;
+  const APInt *C;
+  if (!match(Cmp0, m_ICmp(Pred0, m_Intrinsic<Intrinsic::ctpop>(m_Value(X)),
+                          m_APInt(C))) ||
+      !match(Cmp1, m_ICmp(Pred1, m_Specific(X), m_ZeroInt())) || C->isZero())
+    return nullptr;
+
+  // (ctpop(X) == C) || (X != 0) --> X != 0 where C > 0
+  if (!IsAnd && Pred0 == ICmpInst::ICMP_EQ && Pred1 == ICmpInst::ICMP_NE)
+    return Cmp1;
+  // (ctpop(X) != C) && (X == 0) --> X == 0 where C > 0
+  if (IsAnd && Pred0 == ICmpInst::ICMP_NE && Pred1 == ICmpInst::ICMP_EQ)
+    return Cmp1;
+
+  return nullptr;
+}
+
 static Value *simplifyAndOfICmps(ICmpInst *Op0, ICmpInst *Op1,
                                  const SimplifyQuery &Q) {
   if (Value *X = simplifyUnsignedRangeCheck(Op0, Op1, /*IsAnd=*/true, Q))
@@ -1826,6 +1843,11 @@ static Value *simplifyAndOfICmps(ICmpInst *Op0, ICmpInst *Op1,
     return X;
 
   if (Value *X = simplifyAndOrOfICmpsWithZero(Op0, Op1, true))
+    return X;
+
+  if (Value *X = simplifyAndOrOfICmpsWithCtpop(Op0, Op1, true))
+    return X;
+  if (Value *X = simplifyAndOrOfICmpsWithCtpop(Op1, Op0, true))
     return X;
 
   if (Value *X = simplifyAndOfICmpsWithAdd(Op0, Op1, Q.IIQ))
@@ -1902,6 +1924,11 @@ static Value *simplifyOrOfICmps(ICmpInst *Op0, ICmpInst *Op1,
     return X;
 
   if (Value *X = simplifyAndOrOfICmpsWithZero(Op0, Op1, false))
+    return X;
+
+  if (Value *X = simplifyAndOrOfICmpsWithCtpop(Op0, Op1, false))
+    return X;
+  if (Value *X = simplifyAndOrOfICmpsWithCtpop(Op1, Op0, false))
     return X;
 
   if (Value *X = simplifyOrOfICmpsWithAdd(Op0, Op1, Q.IIQ))
@@ -2328,6 +2355,31 @@ static Value *SimplifyOrInst(Value *Op0, Value *Op1, const SimplifyQuery &Q,
       return ConstantInt::getAllOnesValue(X->getType());
     }
   }
+
+  // A funnel shift (rotate) can be decomposed into simpler shifts. See if we
+  // are mixing in another shift that is redundant with the funnel shift.
+
+  // (fshl X, ?, Y) | (shl X, Y) --> fshl X, ?, Y
+  // (shl X, Y) | (fshl X, ?, Y) --> fshl X, ?, Y
+  if (match(Op0,
+            m_Intrinsic<Intrinsic::fshl>(m_Value(X), m_Value(), m_Value(Y))) &&
+      match(Op1, m_Shl(m_Specific(X), m_Specific(Y))))
+    return Op0;
+  if (match(Op1,
+            m_Intrinsic<Intrinsic::fshl>(m_Value(X), m_Value(), m_Value(Y))) &&
+      match(Op0, m_Shl(m_Specific(X), m_Specific(Y))))
+    return Op1;
+
+  // (fshr ?, X, Y) | (lshr X, Y) --> fshr ?, X, Y
+  // (lshr X, Y) | (fshr ?, X, Y) --> fshr ?, X, Y
+  if (match(Op0,
+            m_Intrinsic<Intrinsic::fshr>(m_Value(), m_Value(X), m_Value(Y))) &&
+      match(Op1, m_LShr(m_Specific(X), m_Specific(Y))))
+    return Op0;
+  if (match(Op1,
+            m_Intrinsic<Intrinsic::fshr>(m_Value(), m_Value(X), m_Value(Y))) &&
+      match(Op0, m_LShr(m_Specific(X), m_Specific(Y))))
+    return Op1;
 
   if (Value *V = simplifyAndOrOfCmps(Q, Op0, Op1, false))
     return V;
@@ -4478,7 +4530,8 @@ static Value *SimplifyGEPInst(Type *SrcTy, Value *Ptr,
 
   // For opaque pointers an all-zero GEP is a no-op. For typed pointers,
   // it may be equivalent to a bitcast.
-  if (Ptr->getType()->isOpaquePointerTy() &&
+  if (Ptr->getType()->getScalarType()->isOpaquePointerTy() &&
+      Ptr->getType() == GEPTy &&
       all_of(Indices, [](const auto *V) { return match(V, m_Zero()); }))
     return Ptr;
 
