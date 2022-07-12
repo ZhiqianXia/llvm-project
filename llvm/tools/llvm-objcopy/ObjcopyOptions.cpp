@@ -551,8 +551,8 @@ static Error loadNewSectionData(StringRef ArgValue, StringRef OptionName,
   return Error::success();
 }
 
-// ParseObjcopyOptions returns the config and sets the input arguments. If a
-// help flag is set then ParseObjcopyOptions will print the help messege and
+// parseObjcopyOptions returns the config and sets the input arguments. If a
+// help flag is set then parseObjcopyOptions will print the help messege and
 // exit.
 Expected<DriverConfig>
 objcopy::parseObjcopyOptions(ArrayRef<const char *> RawArgsArr,
@@ -729,7 +729,6 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> RawArgsArr,
       Config.CompressionType =
           StringSwitch<DebugCompressionType>(
               InputArgs.getLastArgValue(OBJCOPY_compress_debug_sections_eq))
-              .Case("zlib-gnu", DebugCompressionType::GNU)
               .Case("zlib", DebugCompressionType::Z)
               .Default(DebugCompressionType::None);
       if (Config.CompressionType == DebugCompressionType::None)
@@ -740,7 +739,7 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> RawArgsArr,
                 .str()
                 .c_str());
     }
-    if (!zlib::isAvailable())
+    if (!compression::zlib::isAvailable())
       return createStringError(
           errc::invalid_argument,
           "LLVM was not compiled with LLVM_ENABLE_ZLIB: can not compress");
@@ -811,15 +810,9 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> RawArgsArr,
           SFU->Name.str().c_str());
   }
   // Prohibit combinations of --set-section-flags when the section name is used
-  // by --rename-section, either as a source or a destination.
+  // as the destination of a --rename-section.
   for (const auto &E : Config.SectionsToRename) {
     const SectionRename &SR = E.second;
-    if (Config.SetSectionFlags.count(SR.OriginalName))
-      return createStringError(
-          errc::invalid_argument,
-          "--set-section-flags=%s conflicts with --rename-section=%s=%s",
-          SR.OriginalName.str().c_str(), SR.OriginalName.str().c_str(),
-          SR.NewName.str().c_str());
     if (Config.SetSectionFlags.count(SR.NewName))
       return createStringError(
           errc::invalid_argument,
@@ -999,7 +992,7 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> RawArgsArr,
         "--decompress-debug-sections");
   }
 
-  if (Config.DecompressDebugSections && !zlib::isAvailable())
+  if (Config.DecompressDebugSections && !compression::zlib::isAvailable())
     return createStringError(
         errc::invalid_argument,
         "LLVM was not compiled with LLVM_ENABLE_ZLIB: cannot decompress");
@@ -1013,8 +1006,8 @@ objcopy::parseObjcopyOptions(ArrayRef<const char *> RawArgsArr,
   return std::move(DC);
 }
 
-// ParseInstallNameToolOptions returns the config and sets the input arguments.
-// If a help flag is set then ParseInstallNameToolOptions will print the help
+// parseInstallNameToolOptions returns the config and sets the input arguments.
+// If a help flag is set then parseInstallNameToolOptions will print the help
 // messege and exit.
 Expected<DriverConfig>
 objcopy::parseInstallNameToolOptions(ArrayRef<const char *> ArgsArr) {
@@ -1211,8 +1204,8 @@ objcopy::parseBitcodeStripOptions(ArrayRef<const char *> ArgsArr,
   return std::move(DC);
 }
 
-// ParseStripOptions returns the config and sets the input arguments. If a
-// help flag is set then ParseStripOptions will print the help messege and
+// parseStripOptions returns the config and sets the input arguments. If a
+// help flag is set then parseStripOptions will print the help messege and
 // exit.
 Expected<DriverConfig>
 objcopy::parseStripOptions(ArrayRef<const char *> RawArgsArr,
@@ -1313,8 +1306,9 @@ objcopy::parseStripOptions(ArrayRef<const char *> RawArgsArr,
       return std::move(E);
 
   if (!InputArgs.hasArg(STRIP_no_strip_all) && !Config.StripDebug &&
-      !Config.StripUnneeded && Config.DiscardMode == DiscardType::None &&
-      !Config.StripAllGNU && Config.SymbolsToRemove.empty())
+      !Config.OnlyKeepDebug && !Config.StripUnneeded &&
+      Config.DiscardMode == DiscardType::None && !Config.StripAllGNU &&
+      Config.SymbolsToRemove.empty())
     Config.StripAll = true;
 
   if (Config.DiscardMode == DiscardType::All) {
