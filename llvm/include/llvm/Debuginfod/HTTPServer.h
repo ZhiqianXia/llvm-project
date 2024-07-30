@@ -13,8 +13,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SUPPORT_HTTP_SERVER_H
-#define LLVM_SUPPORT_HTTP_SERVER_H
+#ifndef LLVM_DEBUGINFOD_HTTPSERVER_H
+#define LLVM_DEBUGINFOD_HTTPSERVER_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
@@ -33,6 +33,16 @@ namespace llvm {
 struct HTTPResponse;
 struct StreamingHTTPResponse;
 class HTTPServer;
+
+class HTTPServerError : public ErrorInfo<HTTPServerError, ECError> {
+public:
+  static char ID;
+  HTTPServerError(const Twine &Msg);
+  void log(raw_ostream &OS) const override;
+
+private:
+  std::string Msg;
+};
 
 class HTTPServerRequest {
   friend HTTPServer;
@@ -120,4 +130,4 @@ public:
 };
 } // end namespace llvm
 
-#endif // LLVM_SUPPORT_HTTP_SERVER_H
+#endif // LLVM_DEBUGINFOD_HTTPSERVER_H

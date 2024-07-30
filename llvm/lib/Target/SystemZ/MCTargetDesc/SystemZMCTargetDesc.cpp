@@ -23,6 +23,7 @@
 using namespace llvm;
 
 #define GET_INSTRINFO_MC_DESC
+#define ENABLE_INSTR_PREDICATE_VERIFIER
 #include "SystemZGenInstrInfo.inc"
 
 #define GET_SUBTARGETINFO_MC_DESC
@@ -222,17 +223,20 @@ public:
 };
 } // end namespace
 
-static MCTargetStreamer *
-createAsmTargetStreamer(MCStreamer &S,
-                        formatted_raw_ostream &OS,
-                        MCInstPrinter *InstPrint,
-                        bool isVerboseAsm) {
+static MCTargetStreamer *createAsmTargetStreamer(MCStreamer &S,
+                                                 formatted_raw_ostream &OS,
+                                                 MCInstPrinter *InstPrint) {
   return new SystemZTargetAsmStreamer(S, OS);
 }
 
 static MCTargetStreamer *
 createObjectTargetStreamer(MCStreamer &S, const MCSubtargetInfo &STI) {
   return new SystemZTargetELFStreamer(S);
+}
+
+static MCTargetStreamer *
+createNullTargetStreamer(MCStreamer &S) {
+  return new SystemZTargetStreamer(S);
 }
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSystemZTargetMC() {
@@ -271,4 +275,8 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSystemZTargetMC() {
   // Register the obj streamer
   TargetRegistry::RegisterObjectTargetStreamer(getTheSystemZTarget(),
                                                createObjectTargetStreamer);
+
+  // Register the null streamer
+  TargetRegistry::RegisterNullTargetStreamer(getTheSystemZTarget(),
+                                             createNullTargetStreamer);
 }

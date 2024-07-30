@@ -286,7 +286,7 @@ define <8 x i1> @test7a(<8 x i32>%a, <8 x i32>%b) {
 ; SKX-NEXT:    vpmovm2w %k0, %xmm0
 ; SKX-NEXT:    vzeroupper
 ; SKX-NEXT:    callq _func8xi1
-; SKX-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %xmm0, %xmm0
+; SKX-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to4}, %xmm0, %xmm0
 ; SKX-NEXT:    popq %rax
 ; SKX-NEXT:    retq
 ;
@@ -310,7 +310,7 @@ define <8 x i1> @test7a(<8 x i32>%a, <8 x i32>%b) {
 ; FASTISEL-NEXT:    vpmovm2w %k0, %xmm0
 ; FASTISEL-NEXT:    vzeroupper
 ; FASTISEL-NEXT:    callq _func8xi1
-; FASTISEL-NEXT:    vpand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %xmm0, %xmm0
+; FASTISEL-NEXT:    vpandd {{\.?LCPI[0-9]+_[0-9]+}}(%rip){1to4}, %xmm0, %xmm0
 ; FASTISEL-NEXT:    popq %rax
 ; FASTISEL-NEXT:    retq
   %cmpRes = icmp sgt <8 x i32>%a, %b
@@ -435,17 +435,17 @@ define i32 @test12(i32 %a1, i32 %a2, i32 %b1) {
 ; ALL_X64-NEXT:    .cfi_offset %rbx, -32
 ; ALL_X64-NEXT:    .cfi_offset %r14, -24
 ; ALL_X64-NEXT:    .cfi_offset %rbp, -16
-; ALL_X64-NEXT:    movl %esi, %r14d
+; ALL_X64-NEXT:    movl %esi, %ebx
 ; ALL_X64-NEXT:    movl %edi, %ebp
 ; ALL_X64-NEXT:    movl %edx, %esi
 ; ALL_X64-NEXT:    callq _test11
-; ALL_X64-NEXT:    movzbl %al, %ebx
+; ALL_X64-NEXT:    movzbl %al, %r14d
 ; ALL_X64-NEXT:    movl %ebp, %edi
-; ALL_X64-NEXT:    movl %r14d, %esi
-; ALL_X64-NEXT:    movl %ebx, %edx
+; ALL_X64-NEXT:    movl %ebx, %esi
+; ALL_X64-NEXT:    movl %r14d, %edx
 ; ALL_X64-NEXT:    callq _test10
 ; ALL_X64-NEXT:    xorl %ecx, %ecx
-; ALL_X64-NEXT:    testb $1, %bl
+; ALL_X64-NEXT:    testb $1, %r14b
 ; ALL_X64-NEXT:    cmovel %ecx, %eax
 ; ALL_X64-NEXT:    popq %rbx
 ; ALL_X64-NEXT:    popq %r14
@@ -497,17 +497,17 @@ define i32 @test12(i32 %a1, i32 %a2, i32 %b1) {
 ; FASTISEL-NEXT:    .cfi_offset %rbx, -32
 ; FASTISEL-NEXT:    .cfi_offset %r14, -24
 ; FASTISEL-NEXT:    .cfi_offset %rbp, -16
-; FASTISEL-NEXT:    movl %esi, %r14d
+; FASTISEL-NEXT:    movl %esi, %ebx
 ; FASTISEL-NEXT:    movl %edi, %ebp
 ; FASTISEL-NEXT:    movl %edx, %esi
 ; FASTISEL-NEXT:    callq _test11
-; FASTISEL-NEXT:    movzbl %al, %ebx
+; FASTISEL-NEXT:    movzbl %al, %r14d
 ; FASTISEL-NEXT:    movl %ebp, %edi
-; FASTISEL-NEXT:    movl %r14d, %esi
-; FASTISEL-NEXT:    movl %ebx, %edx
+; FASTISEL-NEXT:    movl %ebx, %esi
+; FASTISEL-NEXT:    movl %r14d, %edx
 ; FASTISEL-NEXT:    callq _test10
 ; FASTISEL-NEXT:    xorl %ecx, %ecx
-; FASTISEL-NEXT:    testb $1, %bl
+; FASTISEL-NEXT:    testb $1, %r14b
 ; FASTISEL-NEXT:    cmovel %ecx, %eax
 ; FASTISEL-NEXT:    popq %rbx
 ; FASTISEL-NEXT:    popq %r14
@@ -687,10 +687,10 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    testb $1, {{[0-9]+}}(%rsp)
 ; KNL-NEXT:    cmovnel %eax, %r10d
 ; KNL-NEXT:    movq %rdi, %rax
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    andl $1, %edi
 ; KNL-NEXT:    kmovw %edi, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $14, %k1, %k1
@@ -699,7 +699,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kmovw %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $13, %k1, %k1
@@ -708,7 +708,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kmovw %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $12, %k1, %k1
@@ -717,7 +717,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kmovw %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $11, %k1, %k1
@@ -726,7 +726,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kmovw %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $10, %k1, %k1
@@ -735,7 +735,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kmovw %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $9, %k1, %k1
@@ -744,7 +744,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kmovw %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $8, %k1, %k1
@@ -753,7 +753,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kmovw %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $7, %k1, %k1
@@ -761,7 +761,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    movw $-513, %di ## imm = 0xFDFF
 ; KNL-NEXT:    kmovw %edi, %k7
 ; KNL-NEXT:    kandw %k7, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $6, %k1, %k1
@@ -769,7 +769,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    movw $-1025, %di ## imm = 0xFBFF
 ; KNL-NEXT:    kmovw %edi, %k4
 ; KNL-NEXT:    kandw %k4, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $5, %k1, %k1
@@ -777,7 +777,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    movw $-2049, %di ## imm = 0xF7FF
 ; KNL-NEXT:    kmovw %edi, %k3
 ; KNL-NEXT:    kandw %k3, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $4, %k1, %k1
@@ -785,7 +785,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    movw $-4097, %di ## imm = 0xEFFF
 ; KNL-NEXT:    kmovw %edi, %k2
 ; KNL-NEXT:    kandw %k2, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $3, %k1, %k1
@@ -793,7 +793,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    movw $-8193, %di ## imm = 0xDFFF
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k5
 ; KNL-NEXT:    kshiftlw $15, %k5, %k5
 ; KNL-NEXT:    kshiftrw $2, %k5, %k5
@@ -801,13 +801,13 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    movw $-16385, %di ## imm = 0xBFFF
 ; KNL-NEXT:    kmovw %edi, %k0
 ; KNL-NEXT:    kandw %k0, %k5, %k5
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $14, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k5, %k5
 ; KNL-NEXT:    kshiftlw $1, %k5, %k5
 ; KNL-NEXT:    kshiftrw $1, %k5, %k5
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k5, %k5
@@ -838,70 +838,70 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    korw %k6, %k5, %k5
 ; KNL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL-NEXT:    kandw %k6, %k5, %k5
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k5, %k5
 ; KNL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL-NEXT:    kandw %k6, %k5, %k5
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k5, %k5
 ; KNL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL-NEXT:    kandw %k6, %k5, %k5
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $8, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k5, %k5
 ; KNL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL-NEXT:    kandw %k6, %k5, %k5
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $7, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k5, %k5
 ; KNL-NEXT:    kandw %k7, %k5, %k5
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $6, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k5, %k5
 ; KNL-NEXT:    kandw %k4, %k5, %k4
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k5
 ; KNL-NEXT:    kshiftlw $15, %k5, %k5
 ; KNL-NEXT:    kshiftrw $5, %k5, %k5
 ; KNL-NEXT:    korw %k5, %k4, %k4
 ; KNL-NEXT:    kandw %k3, %k4, %k3
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k4
 ; KNL-NEXT:    kshiftlw $15, %k4, %k4
 ; KNL-NEXT:    kshiftrw $4, %k4, %k4
 ; KNL-NEXT:    korw %k4, %k3, %k3
 ; KNL-NEXT:    kandw %k2, %k3, %k2
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k3
 ; KNL-NEXT:    kshiftlw $15, %k3, %k3
 ; KNL-NEXT:    kshiftrw $3, %k3, %k3
 ; KNL-NEXT:    korw %k3, %k2, %k2
 ; KNL-NEXT:    kandw %k1, %k2, %k1
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k2
 ; KNL-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL-NEXT:    kshiftrw $2, %k2, %k2
 ; KNL-NEXT:    korw %k2, %k1, %k1
 ; KNL-NEXT:    kandw %k0, %k1, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k1
 ; KNL-NEXT:    kshiftlw $14, %k1, %k1
 ; KNL-NEXT:    korw %k1, %k0, %k0
 ; KNL-NEXT:    kshiftlw $1, %k0, %k0
 ; KNL-NEXT:    kshiftrw $1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    korw %k1, %k0, %k0
@@ -910,84 +910,84 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL-NEXT:    kandw %k2, %k0, %k0
 ; KNL-NEXT:    kmovw %r10d, %k2
 ; KNL-NEXT:    kandw %k1, %k2, %k1
-; KNL-NEXT:    kmovw %k1, %r8d
+; KNL-NEXT:    kmovw %k1, %edx
 ; KNL-NEXT:    kshiftrw $1, %k0, %k1
 ; KNL-NEXT:    kmovw %k1, %r9d
 ; KNL-NEXT:    kshiftrw $2, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %r10d
+; KNL-NEXT:    kmovw %k1, %r8d
 ; KNL-NEXT:    kshiftrw $3, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %r11d
-; KNL-NEXT:    kshiftrw $4, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %r12d
-; KNL-NEXT:    kshiftrw $5, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %r15d
-; KNL-NEXT:    kshiftrw $6, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %r14d
-; KNL-NEXT:    kshiftrw $7, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %r13d
-; KNL-NEXT:    kshiftrw $8, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %ebx
-; KNL-NEXT:    kshiftrw $9, %k0, %k1
 ; KNL-NEXT:    kmovw %k1, %esi
-; KNL-NEXT:    kshiftrw $10, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %ebp
-; KNL-NEXT:    kshiftrw $11, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %ecx
-; KNL-NEXT:    kshiftrw $12, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %edx
-; KNL-NEXT:    kshiftrw $13, %k0, %k1
+; KNL-NEXT:    kshiftrw $4, %k0, %k1
 ; KNL-NEXT:    kmovw %k1, %edi
+; KNL-NEXT:    kshiftrw $5, %k0, %k1
+; KNL-NEXT:    kmovw %k1, %ecx
+; KNL-NEXT:    kshiftrw $6, %k0, %k1
+; KNL-NEXT:    kmovw %k1, %r10d
+; KNL-NEXT:    kshiftrw $7, %k0, %k1
+; KNL-NEXT:    kmovw %k1, %ebx
+; KNL-NEXT:    kshiftrw $8, %k0, %k1
+; KNL-NEXT:    kmovw %k1, %ebp
+; KNL-NEXT:    kshiftrw $9, %k0, %k1
+; KNL-NEXT:    kmovw %k1, %r14d
+; KNL-NEXT:    kshiftrw $10, %k0, %k1
+; KNL-NEXT:    kmovw %k1, %r11d
+; KNL-NEXT:    kshiftrw $11, %k0, %k1
+; KNL-NEXT:    kmovw %k1, %r15d
+; KNL-NEXT:    kshiftrw $12, %k0, %k1
+; KNL-NEXT:    kmovw %k1, %r12d
+; KNL-NEXT:    kshiftrw $13, %k0, %k1
+; KNL-NEXT:    kmovw %k1, %r13d
 ; KNL-NEXT:    kshiftrw $14, %k0, %k1
-; KNL-NEXT:    andl $1, %r8d
-; KNL-NEXT:    movb %r8b, 2(%rax)
-; KNL-NEXT:    kmovw %k0, %r8d
-; KNL-NEXT:    andl $1, %r8d
-; KNL-NEXT:    andl $1, %r9d
-; KNL-NEXT:    leal (%r8,%r9,2), %r8d
-; KNL-NEXT:    kmovw %k1, %r9d
-; KNL-NEXT:    kshiftrw $15, %k0, %k0
-; KNL-NEXT:    andl $1, %r10d
-; KNL-NEXT:    leal (%r8,%r10,4), %r8d
-; KNL-NEXT:    kmovw %k0, %r10d
-; KNL-NEXT:    andl $1, %r11d
-; KNL-NEXT:    leal (%r8,%r11,8), %r8d
-; KNL-NEXT:    andl $1, %r12d
-; KNL-NEXT:    shll $4, %r12d
-; KNL-NEXT:    orl %r8d, %r12d
-; KNL-NEXT:    andl $1, %r15d
-; KNL-NEXT:    shll $5, %r15d
-; KNL-NEXT:    orl %r12d, %r15d
-; KNL-NEXT:    andl $1, %r14d
-; KNL-NEXT:    shll $6, %r14d
-; KNL-NEXT:    andl $1, %r13d
-; KNL-NEXT:    shll $7, %r13d
-; KNL-NEXT:    orl %r14d, %r13d
-; KNL-NEXT:    andl $1, %ebx
-; KNL-NEXT:    shll $8, %ebx
-; KNL-NEXT:    orl %r13d, %ebx
-; KNL-NEXT:    andl $1, %esi
-; KNL-NEXT:    shll $9, %esi
-; KNL-NEXT:    orl %ebx, %esi
-; KNL-NEXT:    andl $1, %ebp
-; KNL-NEXT:    shll $10, %ebp
-; KNL-NEXT:    orl %esi, %ebp
-; KNL-NEXT:    orl %r15d, %ebp
-; KNL-NEXT:    andl $1, %ecx
-; KNL-NEXT:    shll $11, %ecx
 ; KNL-NEXT:    andl $1, %edx
-; KNL-NEXT:    shll $12, %edx
-; KNL-NEXT:    orl %ecx, %edx
-; KNL-NEXT:    andl $1, %edi
-; KNL-NEXT:    shll $13, %edi
-; KNL-NEXT:    orl %edx, %edi
+; KNL-NEXT:    movb %dl, 2(%rax)
+; KNL-NEXT:    kmovw %k0, %edx
+; KNL-NEXT:    andl $1, %edx
 ; KNL-NEXT:    andl $1, %r9d
-; KNL-NEXT:    shll $14, %r9d
-; KNL-NEXT:    orl %edi, %r9d
+; KNL-NEXT:    leal (%rdx,%r9,2), %r9d
+; KNL-NEXT:    kmovw %k1, %edx
+; KNL-NEXT:    kshiftrw $15, %k0, %k0
+; KNL-NEXT:    andl $1, %r8d
+; KNL-NEXT:    leal (%r9,%r8,4), %r9d
+; KNL-NEXT:    kmovw %k0, %r8d
+; KNL-NEXT:    andl $1, %esi
+; KNL-NEXT:    leal (%r9,%rsi,8), %esi
+; KNL-NEXT:    andl $1, %edi
+; KNL-NEXT:    shll $4, %edi
+; KNL-NEXT:    orl %esi, %edi
+; KNL-NEXT:    andl $1, %ecx
+; KNL-NEXT:    shll $5, %ecx
+; KNL-NEXT:    orl %edi, %ecx
 ; KNL-NEXT:    andl $1, %r10d
-; KNL-NEXT:    shll $15, %r10d
-; KNL-NEXT:    orl %r9d, %r10d
-; KNL-NEXT:    orl %ebp, %r10d
-; KNL-NEXT:    movw %r10w, (%rax)
+; KNL-NEXT:    shll $6, %r10d
+; KNL-NEXT:    andl $1, %ebx
+; KNL-NEXT:    shll $7, %ebx
+; KNL-NEXT:    orl %r10d, %ebx
+; KNL-NEXT:    andl $1, %ebp
+; KNL-NEXT:    shll $8, %ebp
+; KNL-NEXT:    orl %ebx, %ebp
+; KNL-NEXT:    andl $1, %r14d
+; KNL-NEXT:    shll $9, %r14d
+; KNL-NEXT:    orl %ebp, %r14d
+; KNL-NEXT:    andl $1, %r11d
+; KNL-NEXT:    shll $10, %r11d
+; KNL-NEXT:    orl %r14d, %r11d
+; KNL-NEXT:    orl %ecx, %r11d
+; KNL-NEXT:    andl $1, %r15d
+; KNL-NEXT:    shll $11, %r15d
+; KNL-NEXT:    andl $1, %r12d
+; KNL-NEXT:    shll $12, %r12d
+; KNL-NEXT:    orl %r15d, %r12d
+; KNL-NEXT:    andl $1, %r13d
+; KNL-NEXT:    shll $13, %r13d
+; KNL-NEXT:    orl %r12d, %r13d
+; KNL-NEXT:    andl $1, %edx
+; KNL-NEXT:    shll $14, %edx
+; KNL-NEXT:    orl %r13d, %edx
+; KNL-NEXT:    andl $1, %r8d
+; KNL-NEXT:    shll $15, %r8d
+; KNL-NEXT:    orl %edx, %r8d
+; KNL-NEXT:    orl %r11d, %r8d
+; KNL-NEXT:    movw %r8w, (%rax)
 ; KNL-NEXT:    popq %rbx
 ; KNL-NEXT:    popq %r12
 ; KNL-NEXT:    popq %r13
@@ -1085,16 +1085,16 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; SKX-NEXT:    kshiftrd $21, %k1, %k1
 ; SKX-NEXT:    kord %k1, %k0, %k0
 ; SKX-NEXT:    movl $-2049, %edi ## imm = 0xF7FF
-; SKX-NEXT:    kmovd %edi, %k1
-; SKX-NEXT:    kmovd %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 4-byte Spill
-; SKX-NEXT:    kandd %k1, %k0, %k0
+; SKX-NEXT:    kmovd %edi, %k6
+; SKX-NEXT:    kandd %k6, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftld $31, %k1, %k1
 ; SKX-NEXT:    kshiftrd $20, %k1, %k1
 ; SKX-NEXT:    kord %k1, %k0, %k0
 ; SKX-NEXT:    movl $-4097, %edi ## imm = 0xEFFF
-; SKX-NEXT:    kmovd %edi, %k6
-; SKX-NEXT:    kandd %k6, %k0, %k0
+; SKX-NEXT:    kmovd %edi, %k1
+; SKX-NEXT:    kmovd %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 4-byte Spill
+; SKX-NEXT:    kandd %k1, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftld $31, %k1, %k1
 ; SKX-NEXT:    kshiftrd $19, %k1, %k1
@@ -1190,14 +1190,14 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; SKX-NEXT:    kshiftrd $21, %k1, %k1
 ; SKX-NEXT:    kord %k1, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; SKX-NEXT:    kmovd {{[-0-9]+}}(%r{{[sb]}}p), %k7 ## 4-byte Reload
-; SKX-NEXT:    kandd %k7, %k0, %k0
+; SKX-NEXT:    kandd %k6, %k0, %k0
 ; SKX-NEXT:    kshiftld $31, %k1, %k1
 ; SKX-NEXT:    kshiftrd $20, %k1, %k1
-; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
+; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k6
 ; SKX-NEXT:    kord %k1, %k0, %k0
-; SKX-NEXT:    kandd %k6, %k0, %k0
-; SKX-NEXT:    kshiftld $31, %k7, %k1
+; SKX-NEXT:    kmovd {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 4-byte Reload
+; SKX-NEXT:    kandd %k1, %k0, %k0
+; SKX-NEXT:    kshiftld $31, %k6, %k1
 ; SKX-NEXT:    kshiftrd $19, %k1, %k1
 ; SKX-NEXT:    kord %k1, %k0, %k0
 ; SKX-NEXT:    kandd %k5, %k0, %k0
@@ -1223,84 +1223,84 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; SKX-NEXT:    kmovd {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 4-byte Reload
 ; SKX-NEXT:    kandd %k1, %k0, %k0
 ; SKX-NEXT:    kshiftrd $16, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %r8d
+; SKX-NEXT:    kmovd %k1, %edx
 ; SKX-NEXT:    kshiftrd $1, %k0, %k1
 ; SKX-NEXT:    kmovd %k1, %r9d
 ; SKX-NEXT:    kshiftrd $2, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %r10d
+; SKX-NEXT:    kmovd %k1, %r8d
 ; SKX-NEXT:    kshiftrd $3, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %r11d
-; SKX-NEXT:    kshiftrd $4, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %r12d
-; SKX-NEXT:    kshiftrd $5, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %r15d
-; SKX-NEXT:    kshiftrd $6, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %r14d
-; SKX-NEXT:    kshiftrd $7, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %r13d
-; SKX-NEXT:    kshiftrd $8, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %ebx
-; SKX-NEXT:    kshiftrd $9, %k0, %k1
 ; SKX-NEXT:    kmovd %k1, %esi
-; SKX-NEXT:    kshiftrd $10, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %ebp
-; SKX-NEXT:    kshiftrd $11, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %ecx
-; SKX-NEXT:    kshiftrd $12, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %edx
-; SKX-NEXT:    kshiftrd $13, %k0, %k1
+; SKX-NEXT:    kshiftrd $4, %k0, %k1
 ; SKX-NEXT:    kmovd %k1, %edi
+; SKX-NEXT:    kshiftrd $5, %k0, %k1
+; SKX-NEXT:    kmovd %k1, %ecx
+; SKX-NEXT:    kshiftrd $6, %k0, %k1
+; SKX-NEXT:    kmovd %k1, %r10d
+; SKX-NEXT:    kshiftrd $7, %k0, %k1
+; SKX-NEXT:    kmovd %k1, %ebx
+; SKX-NEXT:    kshiftrd $8, %k0, %k1
+; SKX-NEXT:    kmovd %k1, %ebp
+; SKX-NEXT:    kshiftrd $9, %k0, %k1
+; SKX-NEXT:    kmovd %k1, %r14d
+; SKX-NEXT:    kshiftrd $10, %k0, %k1
+; SKX-NEXT:    kmovd %k1, %r11d
+; SKX-NEXT:    kshiftrd $11, %k0, %k1
+; SKX-NEXT:    kmovd %k1, %r15d
+; SKX-NEXT:    kshiftrd $12, %k0, %k1
+; SKX-NEXT:    kmovd %k1, %r12d
+; SKX-NEXT:    kshiftrd $13, %k0, %k1
+; SKX-NEXT:    kmovd %k1, %r13d
 ; SKX-NEXT:    kshiftrd $14, %k0, %k1
-; SKX-NEXT:    andl $1, %r8d
-; SKX-NEXT:    movb %r8b, 2(%rax)
-; SKX-NEXT:    kmovd %k0, %r8d
-; SKX-NEXT:    andl $1, %r8d
-; SKX-NEXT:    andl $1, %r9d
-; SKX-NEXT:    leal (%r8,%r9,2), %r8d
-; SKX-NEXT:    kmovd %k1, %r9d
-; SKX-NEXT:    kshiftrd $15, %k0, %k0
-; SKX-NEXT:    andl $1, %r10d
-; SKX-NEXT:    leal (%r8,%r10,4), %r8d
-; SKX-NEXT:    kmovd %k0, %r10d
-; SKX-NEXT:    andl $1, %r11d
-; SKX-NEXT:    leal (%r8,%r11,8), %r8d
-; SKX-NEXT:    andl $1, %r12d
-; SKX-NEXT:    shll $4, %r12d
-; SKX-NEXT:    orl %r8d, %r12d
-; SKX-NEXT:    andl $1, %r15d
-; SKX-NEXT:    shll $5, %r15d
-; SKX-NEXT:    orl %r12d, %r15d
-; SKX-NEXT:    andl $1, %r14d
-; SKX-NEXT:    shll $6, %r14d
-; SKX-NEXT:    andl $1, %r13d
-; SKX-NEXT:    shll $7, %r13d
-; SKX-NEXT:    orl %r14d, %r13d
-; SKX-NEXT:    andl $1, %ebx
-; SKX-NEXT:    shll $8, %ebx
-; SKX-NEXT:    orl %r13d, %ebx
-; SKX-NEXT:    andl $1, %esi
-; SKX-NEXT:    shll $9, %esi
-; SKX-NEXT:    orl %ebx, %esi
-; SKX-NEXT:    andl $1, %ebp
-; SKX-NEXT:    shll $10, %ebp
-; SKX-NEXT:    orl %esi, %ebp
-; SKX-NEXT:    orl %r15d, %ebp
-; SKX-NEXT:    andl $1, %ecx
-; SKX-NEXT:    shll $11, %ecx
 ; SKX-NEXT:    andl $1, %edx
-; SKX-NEXT:    shll $12, %edx
-; SKX-NEXT:    orl %ecx, %edx
-; SKX-NEXT:    andl $1, %edi
-; SKX-NEXT:    shll $13, %edi
-; SKX-NEXT:    orl %edx, %edi
+; SKX-NEXT:    movb %dl, 2(%rax)
+; SKX-NEXT:    kmovd %k0, %edx
+; SKX-NEXT:    andl $1, %edx
 ; SKX-NEXT:    andl $1, %r9d
-; SKX-NEXT:    shll $14, %r9d
-; SKX-NEXT:    orl %edi, %r9d
+; SKX-NEXT:    leal (%rdx,%r9,2), %r9d
+; SKX-NEXT:    kmovd %k1, %edx
+; SKX-NEXT:    kshiftrd $15, %k0, %k0
+; SKX-NEXT:    andl $1, %r8d
+; SKX-NEXT:    leal (%r9,%r8,4), %r9d
+; SKX-NEXT:    kmovd %k0, %r8d
+; SKX-NEXT:    andl $1, %esi
+; SKX-NEXT:    leal (%r9,%rsi,8), %esi
+; SKX-NEXT:    andl $1, %edi
+; SKX-NEXT:    shll $4, %edi
+; SKX-NEXT:    orl %esi, %edi
+; SKX-NEXT:    andl $1, %ecx
+; SKX-NEXT:    shll $5, %ecx
+; SKX-NEXT:    orl %edi, %ecx
 ; SKX-NEXT:    andl $1, %r10d
-; SKX-NEXT:    shll $15, %r10d
-; SKX-NEXT:    orl %r9d, %r10d
-; SKX-NEXT:    orl %ebp, %r10d
-; SKX-NEXT:    movw %r10w, (%rax)
+; SKX-NEXT:    shll $6, %r10d
+; SKX-NEXT:    andl $1, %ebx
+; SKX-NEXT:    shll $7, %ebx
+; SKX-NEXT:    orl %r10d, %ebx
+; SKX-NEXT:    andl $1, %ebp
+; SKX-NEXT:    shll $8, %ebp
+; SKX-NEXT:    orl %ebx, %ebp
+; SKX-NEXT:    andl $1, %r14d
+; SKX-NEXT:    shll $9, %r14d
+; SKX-NEXT:    orl %ebp, %r14d
+; SKX-NEXT:    andl $1, %r11d
+; SKX-NEXT:    shll $10, %r11d
+; SKX-NEXT:    orl %r14d, %r11d
+; SKX-NEXT:    orl %ecx, %r11d
+; SKX-NEXT:    andl $1, %r15d
+; SKX-NEXT:    shll $11, %r15d
+; SKX-NEXT:    andl $1, %r12d
+; SKX-NEXT:    shll $12, %r12d
+; SKX-NEXT:    orl %r15d, %r12d
+; SKX-NEXT:    andl $1, %r13d
+; SKX-NEXT:    shll $13, %r13d
+; SKX-NEXT:    orl %r12d, %r13d
+; SKX-NEXT:    andl $1, %edx
+; SKX-NEXT:    shll $14, %edx
+; SKX-NEXT:    orl %r13d, %edx
+; SKX-NEXT:    andl $1, %r8d
+; SKX-NEXT:    shll $15, %r8d
+; SKX-NEXT:    orl %edx, %r8d
+; SKX-NEXT:    orl %r11d, %r8d
+; SKX-NEXT:    movw %r8w, (%rax)
 ; SKX-NEXT:    popq %rbx
 ; SKX-NEXT:    popq %r12
 ; SKX-NEXT:    popq %r13
@@ -1323,10 +1323,10 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    cmovnel %edx, %ecx
 ; KNL_X32-NEXT:    testb $1, {{[0-9]+}}(%esp)
 ; KNL_X32-NEXT:    cmovnel %edx, %eax
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    andl $1, %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $14, %k1, %k1
@@ -1335,7 +1335,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kmovw %k1, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $13, %k1, %k1
@@ -1344,7 +1344,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kmovw %k1, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $12, %k1, %k1
@@ -1353,7 +1353,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kmovw %k1, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $11, %k1, %k1
@@ -1362,7 +1362,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kmovw %k1, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $10, %k1, %k1
@@ -1371,7 +1371,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kmovw %k1, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $9, %k1, %k1
@@ -1380,7 +1380,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kmovw %k1, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $8, %k1, %k1
@@ -1389,7 +1389,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kmovw %k1, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $7, %k1, %k1
@@ -1397,7 +1397,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    movw $-513, %dx ## imm = 0xFDFF
 ; KNL_X32-NEXT:    kmovw %edx, %k7
 ; KNL_X32-NEXT:    kandw %k7, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $6, %k1, %k1
@@ -1405,7 +1405,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    movw $-1025, %dx ## imm = 0xFBFF
 ; KNL_X32-NEXT:    kmovw %edx, %k4
 ; KNL_X32-NEXT:    kandw %k4, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $5, %k1, %k1
@@ -1413,7 +1413,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    movw $-2049, %dx ## imm = 0xF7FF
 ; KNL_X32-NEXT:    kmovw %edx, %k3
 ; KNL_X32-NEXT:    kandw %k3, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $4, %k1, %k1
@@ -1421,7 +1421,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    movw $-4097, %dx ## imm = 0xEFFF
 ; KNL_X32-NEXT:    kmovw %edx, %k2
 ; KNL_X32-NEXT:    kandw %k2, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $3, %k1, %k1
@@ -1429,7 +1429,7 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    movw $-8193, %dx ## imm = 0xDFFF
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k5
 ; KNL_X32-NEXT:    kshiftlw $15, %k5, %k5
 ; KNL_X32-NEXT:    kshiftrw $2, %k5, %k5
@@ -1437,20 +1437,20 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    movw $-16385, %dx ## imm = 0xBFFF
 ; KNL_X32-NEXT:    kmovw %edx, %k0
 ; KNL_X32-NEXT:    kandw %k0, %k5, %k5
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k6
 ; KNL_X32-NEXT:    kshiftlw $14, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k5, %k5
 ; KNL_X32-NEXT:    kshiftlw $1, %k5, %k5
 ; KNL_X32-NEXT:    kshiftrw $1, %k5, %k5
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k5, %k5
 ; KNL_X32-NEXT:    kmovw %k5, (%esp) ## 2-byte Spill
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    andl $1, %edx
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %bl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %ebx
 ; KNL_X32-NEXT:    kmovw %ebx, %k5
 ; KNL_X32-NEXT:    kshiftlw $15, %k5, %k5
 ; KNL_X32-NEXT:    kshiftrw $14, %k5, %k5
@@ -1458,91 +1458,91 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; KNL_X32-NEXT:    korw %k5, %k6, %k5
 ; KNL_X32-NEXT:    kmovw {{[-0-9]+}}(%e{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL_X32-NEXT:    kandw %k6, %k5, %k5
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k5, %k5
 ; KNL_X32-NEXT:    kmovw {{[-0-9]+}}(%e{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL_X32-NEXT:    kandw %k6, %k5, %k5
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k5, %k5
 ; KNL_X32-NEXT:    kmovw {{[-0-9]+}}(%e{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL_X32-NEXT:    kandw %k6, %k5, %k5
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k5, %k5
 ; KNL_X32-NEXT:    kmovw {{[-0-9]+}}(%e{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL_X32-NEXT:    kandw %k6, %k5, %k5
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k5, %k5
 ; KNL_X32-NEXT:    kmovw {{[-0-9]+}}(%e{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL_X32-NEXT:    kandw %k6, %k5, %k5
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k5, %k5
 ; KNL_X32-NEXT:    kmovw {{[-0-9]+}}(%e{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL_X32-NEXT:    kandw %k6, %k5, %k5
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $8, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k5, %k5
 ; KNL_X32-NEXT:    kmovw {{[-0-9]+}}(%e{{[sb]}}p), %k6 ## 2-byte Reload
 ; KNL_X32-NEXT:    kandw %k6, %k5, %k5
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $7, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k5, %k5
 ; KNL_X32-NEXT:    kandw %k7, %k5, %k5
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $6, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k5, %k5
 ; KNL_X32-NEXT:    kandw %k4, %k5, %k4
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k5
 ; KNL_X32-NEXT:    kshiftlw $15, %k5, %k5
 ; KNL_X32-NEXT:    kshiftrw $5, %k5, %k5
 ; KNL_X32-NEXT:    korw %k5, %k4, %k4
 ; KNL_X32-NEXT:    kandw %k3, %k4, %k3
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k4
 ; KNL_X32-NEXT:    kshiftlw $15, %k4, %k4
 ; KNL_X32-NEXT:    kshiftrw $4, %k4, %k4
 ; KNL_X32-NEXT:    korw %k4, %k3, %k3
 ; KNL_X32-NEXT:    kandw %k2, %k3, %k2
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k3
 ; KNL_X32-NEXT:    kshiftlw $15, %k3, %k3
 ; KNL_X32-NEXT:    kshiftrw $3, %k3, %k3
 ; KNL_X32-NEXT:    korw %k3, %k2, %k2
 ; KNL_X32-NEXT:    kandw %k1, %k2, %k1
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k2
 ; KNL_X32-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL_X32-NEXT:    kshiftrw $2, %k2, %k2
 ; KNL_X32-NEXT:    korw %k2, %k1, %k1
 ; KNL_X32-NEXT:    kandw %k0, %k1, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $14, %k1, %k1
 ; KNL_X32-NEXT:    korw %k1, %k0, %k0
 ; KNL_X32-NEXT:    kshiftlw $1, %k0, %k0
 ; KNL_X32-NEXT:    kshiftrw $1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %dl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %edx
 ; KNL_X32-NEXT:    kmovw %edx, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    korw %k1, %k0, %k0
@@ -1726,16 +1726,16 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; FASTISEL-NEXT:    kshiftrd $21, %k1, %k1
 ; FASTISEL-NEXT:    kord %k1, %k0, %k0
 ; FASTISEL-NEXT:    movl $-2049, %edi ## imm = 0xF7FF
-; FASTISEL-NEXT:    kmovd %edi, %k1
-; FASTISEL-NEXT:    kmovd %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 4-byte Spill
-; FASTISEL-NEXT:    kandd %k1, %k0, %k0
+; FASTISEL-NEXT:    kmovd %edi, %k6
+; FASTISEL-NEXT:    kandd %k6, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftld $31, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrd $20, %k1, %k1
 ; FASTISEL-NEXT:    kord %k1, %k0, %k0
 ; FASTISEL-NEXT:    movl $-4097, %edi ## imm = 0xEFFF
-; FASTISEL-NEXT:    kmovd %edi, %k6
-; FASTISEL-NEXT:    kandd %k6, %k0, %k0
+; FASTISEL-NEXT:    kmovd %edi, %k1
+; FASTISEL-NEXT:    kmovd %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 4-byte Spill
+; FASTISEL-NEXT:    kandd %k1, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftld $31, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrd $19, %k1, %k1
@@ -1831,14 +1831,14 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; FASTISEL-NEXT:    kshiftrd $21, %k1, %k1
 ; FASTISEL-NEXT:    kord %k1, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kmovd {{[-0-9]+}}(%r{{[sb]}}p), %k7 ## 4-byte Reload
-; FASTISEL-NEXT:    kandd %k7, %k0, %k0
+; FASTISEL-NEXT:    kandd %k6, %k0, %k0
 ; FASTISEL-NEXT:    kshiftld $31, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrd $20, %k1, %k1
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k6
 ; FASTISEL-NEXT:    kord %k1, %k0, %k0
-; FASTISEL-NEXT:    kandd %k6, %k0, %k0
-; FASTISEL-NEXT:    kshiftld $31, %k7, %k1
+; FASTISEL-NEXT:    kmovd {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 4-byte Reload
+; FASTISEL-NEXT:    kandd %k1, %k0, %k0
+; FASTISEL-NEXT:    kshiftld $31, %k6, %k1
 ; FASTISEL-NEXT:    kshiftrd $19, %k1, %k1
 ; FASTISEL-NEXT:    kord %k1, %k0, %k0
 ; FASTISEL-NEXT:    kandd %k5, %k0, %k0
@@ -1864,84 +1864,84 @@ define <17 x i1> @test16(<17 x i1> %a, <17 x i1> %b) nounwind {
 ; FASTISEL-NEXT:    kmovd {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 4-byte Reload
 ; FASTISEL-NEXT:    kandd %k1, %k0, %k0
 ; FASTISEL-NEXT:    kshiftrd $16, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %r8d
+; FASTISEL-NEXT:    kmovd %k1, %edx
 ; FASTISEL-NEXT:    kshiftrd $1, %k0, %k1
 ; FASTISEL-NEXT:    kmovd %k1, %r9d
 ; FASTISEL-NEXT:    kshiftrd $2, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %r10d
+; FASTISEL-NEXT:    kmovd %k1, %r8d
 ; FASTISEL-NEXT:    kshiftrd $3, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %r11d
-; FASTISEL-NEXT:    kshiftrd $4, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %r12d
-; FASTISEL-NEXT:    kshiftrd $5, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %r15d
-; FASTISEL-NEXT:    kshiftrd $6, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %r14d
-; FASTISEL-NEXT:    kshiftrd $7, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %r13d
-; FASTISEL-NEXT:    kshiftrd $8, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %ebx
-; FASTISEL-NEXT:    kshiftrd $9, %k0, %k1
 ; FASTISEL-NEXT:    kmovd %k1, %esi
-; FASTISEL-NEXT:    kshiftrd $10, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %ebp
-; FASTISEL-NEXT:    kshiftrd $11, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %ecx
-; FASTISEL-NEXT:    kshiftrd $12, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %edx
-; FASTISEL-NEXT:    kshiftrd $13, %k0, %k1
+; FASTISEL-NEXT:    kshiftrd $4, %k0, %k1
 ; FASTISEL-NEXT:    kmovd %k1, %edi
+; FASTISEL-NEXT:    kshiftrd $5, %k0, %k1
+; FASTISEL-NEXT:    kmovd %k1, %ecx
+; FASTISEL-NEXT:    kshiftrd $6, %k0, %k1
+; FASTISEL-NEXT:    kmovd %k1, %r10d
+; FASTISEL-NEXT:    kshiftrd $7, %k0, %k1
+; FASTISEL-NEXT:    kmovd %k1, %ebx
+; FASTISEL-NEXT:    kshiftrd $8, %k0, %k1
+; FASTISEL-NEXT:    kmovd %k1, %ebp
+; FASTISEL-NEXT:    kshiftrd $9, %k0, %k1
+; FASTISEL-NEXT:    kmovd %k1, %r14d
+; FASTISEL-NEXT:    kshiftrd $10, %k0, %k1
+; FASTISEL-NEXT:    kmovd %k1, %r11d
+; FASTISEL-NEXT:    kshiftrd $11, %k0, %k1
+; FASTISEL-NEXT:    kmovd %k1, %r15d
+; FASTISEL-NEXT:    kshiftrd $12, %k0, %k1
+; FASTISEL-NEXT:    kmovd %k1, %r12d
+; FASTISEL-NEXT:    kshiftrd $13, %k0, %k1
+; FASTISEL-NEXT:    kmovd %k1, %r13d
 ; FASTISEL-NEXT:    kshiftrd $14, %k0, %k1
-; FASTISEL-NEXT:    andl $1, %r8d
-; FASTISEL-NEXT:    movb %r8b, 2(%rax)
-; FASTISEL-NEXT:    kmovd %k0, %r8d
-; FASTISEL-NEXT:    andl $1, %r8d
-; FASTISEL-NEXT:    andl $1, %r9d
-; FASTISEL-NEXT:    leal (%r8,%r9,2), %r8d
-; FASTISEL-NEXT:    kmovd %k1, %r9d
-; FASTISEL-NEXT:    kshiftrd $15, %k0, %k0
-; FASTISEL-NEXT:    andl $1, %r10d
-; FASTISEL-NEXT:    leal (%r8,%r10,4), %r8d
-; FASTISEL-NEXT:    kmovd %k0, %r10d
-; FASTISEL-NEXT:    andl $1, %r11d
-; FASTISEL-NEXT:    leal (%r8,%r11,8), %r8d
-; FASTISEL-NEXT:    andl $1, %r12d
-; FASTISEL-NEXT:    shll $4, %r12d
-; FASTISEL-NEXT:    orl %r8d, %r12d
-; FASTISEL-NEXT:    andl $1, %r15d
-; FASTISEL-NEXT:    shll $5, %r15d
-; FASTISEL-NEXT:    orl %r12d, %r15d
-; FASTISEL-NEXT:    andl $1, %r14d
-; FASTISEL-NEXT:    shll $6, %r14d
-; FASTISEL-NEXT:    andl $1, %r13d
-; FASTISEL-NEXT:    shll $7, %r13d
-; FASTISEL-NEXT:    orl %r14d, %r13d
-; FASTISEL-NEXT:    andl $1, %ebx
-; FASTISEL-NEXT:    shll $8, %ebx
-; FASTISEL-NEXT:    orl %r13d, %ebx
-; FASTISEL-NEXT:    andl $1, %esi
-; FASTISEL-NEXT:    shll $9, %esi
-; FASTISEL-NEXT:    orl %ebx, %esi
-; FASTISEL-NEXT:    andl $1, %ebp
-; FASTISEL-NEXT:    shll $10, %ebp
-; FASTISEL-NEXT:    orl %esi, %ebp
-; FASTISEL-NEXT:    orl %r15d, %ebp
-; FASTISEL-NEXT:    andl $1, %ecx
-; FASTISEL-NEXT:    shll $11, %ecx
 ; FASTISEL-NEXT:    andl $1, %edx
-; FASTISEL-NEXT:    shll $12, %edx
-; FASTISEL-NEXT:    orl %ecx, %edx
-; FASTISEL-NEXT:    andl $1, %edi
-; FASTISEL-NEXT:    shll $13, %edi
-; FASTISEL-NEXT:    orl %edx, %edi
+; FASTISEL-NEXT:    movb %dl, 2(%rax)
+; FASTISEL-NEXT:    kmovd %k0, %edx
+; FASTISEL-NEXT:    andl $1, %edx
 ; FASTISEL-NEXT:    andl $1, %r9d
-; FASTISEL-NEXT:    shll $14, %r9d
-; FASTISEL-NEXT:    orl %edi, %r9d
+; FASTISEL-NEXT:    leal (%rdx,%r9,2), %r9d
+; FASTISEL-NEXT:    kmovd %k1, %edx
+; FASTISEL-NEXT:    kshiftrd $15, %k0, %k0
+; FASTISEL-NEXT:    andl $1, %r8d
+; FASTISEL-NEXT:    leal (%r9,%r8,4), %r9d
+; FASTISEL-NEXT:    kmovd %k0, %r8d
+; FASTISEL-NEXT:    andl $1, %esi
+; FASTISEL-NEXT:    leal (%r9,%rsi,8), %esi
+; FASTISEL-NEXT:    andl $1, %edi
+; FASTISEL-NEXT:    shll $4, %edi
+; FASTISEL-NEXT:    orl %esi, %edi
+; FASTISEL-NEXT:    andl $1, %ecx
+; FASTISEL-NEXT:    shll $5, %ecx
+; FASTISEL-NEXT:    orl %edi, %ecx
 ; FASTISEL-NEXT:    andl $1, %r10d
-; FASTISEL-NEXT:    shll $15, %r10d
-; FASTISEL-NEXT:    orl %r9d, %r10d
-; FASTISEL-NEXT:    orl %ebp, %r10d
-; FASTISEL-NEXT:    movw %r10w, (%rax)
+; FASTISEL-NEXT:    shll $6, %r10d
+; FASTISEL-NEXT:    andl $1, %ebx
+; FASTISEL-NEXT:    shll $7, %ebx
+; FASTISEL-NEXT:    orl %r10d, %ebx
+; FASTISEL-NEXT:    andl $1, %ebp
+; FASTISEL-NEXT:    shll $8, %ebp
+; FASTISEL-NEXT:    orl %ebx, %ebp
+; FASTISEL-NEXT:    andl $1, %r14d
+; FASTISEL-NEXT:    shll $9, %r14d
+; FASTISEL-NEXT:    orl %ebp, %r14d
+; FASTISEL-NEXT:    andl $1, %r11d
+; FASTISEL-NEXT:    shll $10, %r11d
+; FASTISEL-NEXT:    orl %r14d, %r11d
+; FASTISEL-NEXT:    orl %ecx, %r11d
+; FASTISEL-NEXT:    andl $1, %r15d
+; FASTISEL-NEXT:    shll $11, %r15d
+; FASTISEL-NEXT:    andl $1, %r12d
+; FASTISEL-NEXT:    shll $12, %r12d
+; FASTISEL-NEXT:    orl %r15d, %r12d
+; FASTISEL-NEXT:    andl $1, %r13d
+; FASTISEL-NEXT:    shll $13, %r13d
+; FASTISEL-NEXT:    orl %r12d, %r13d
+; FASTISEL-NEXT:    andl $1, %edx
+; FASTISEL-NEXT:    shll $14, %edx
+; FASTISEL-NEXT:    orl %r13d, %edx
+; FASTISEL-NEXT:    andl $1, %r8d
+; FASTISEL-NEXT:    shll $15, %r8d
+; FASTISEL-NEXT:    orl %edx, %r8d
+; FASTISEL-NEXT:    orl %r11d, %r8d
+; FASTISEL-NEXT:    movw %r8w, (%rax)
 ; FASTISEL-NEXT:    popq %rbx
 ; FASTISEL-NEXT:    popq %r12
 ; FASTISEL-NEXT:    popq %r13
@@ -1957,10 +1957,10 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL-LABEL: test17:
 ; KNL:       ## %bb.0:
 ; KNL-NEXT:    movq %rdi, %rax
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    andl $1, %edi
 ; KNL-NEXT:    kmovw %edi, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL-NEXT:    kshiftrw $14, %k1, %k1
@@ -1968,7 +1968,7 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL-NEXT:    movw $-5, %di
 ; KNL-NEXT:    kmovw %edi, %k1
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k2
 ; KNL-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL-NEXT:    kshiftrw $13, %k2, %k2
@@ -1976,7 +1976,7 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL-NEXT:    movw $-9, %di
 ; KNL-NEXT:    kmovw %edi, %k2
 ; KNL-NEXT:    kandw %k2, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k3
 ; KNL-NEXT:    kshiftlw $15, %k3, %k3
 ; KNL-NEXT:    kshiftrw $12, %k3, %k3
@@ -1984,7 +1984,7 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL-NEXT:    movw $-17, %di
 ; KNL-NEXT:    kmovw %edi, %k3
 ; KNL-NEXT:    kandw %k3, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k4
 ; KNL-NEXT:    kshiftlw $15, %k4, %k4
 ; KNL-NEXT:    kshiftrw $11, %k4, %k4
@@ -1992,7 +1992,7 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL-NEXT:    movw $-33, %di
 ; KNL-NEXT:    kmovw %edi, %k4
 ; KNL-NEXT:    kandw %k4, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k5
 ; KNL-NEXT:    kshiftlw $15, %k5, %k5
 ; KNL-NEXT:    kshiftrw $10, %k5, %k5
@@ -2000,241 +2000,241 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL-NEXT:    movw $-65, %di
 ; KNL-NEXT:    kmovw %edi, %k5
 ; KNL-NEXT:    kandw %k5, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    andl $1, %edi
 ; KNL-NEXT:    kmovw %edi, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $14, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k2, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k3, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k4, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k5, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %r10b
-; KNL-NEXT:    andl $1, %r10d
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
-; KNL-NEXT:    kmovw %edi, %k0
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
+; KNL-NEXT:    andl $1, %edi
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %r10d
+; KNL-NEXT:    kmovw %r10d, %k0
 ; KNL-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL-NEXT:    kshiftrw $14, %k0, %k0
-; KNL-NEXT:    kmovw %r10d, %k6
+; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    korw %k0, %k6, %k0
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k2, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k3, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k4, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k5, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %r10b
-; KNL-NEXT:    andl $1, %r10d
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
-; KNL-NEXT:    kmovw %edi, %k0
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
+; KNL-NEXT:    andl $1, %edi
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %r10d
+; KNL-NEXT:    kmovw %r10d, %k0
 ; KNL-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL-NEXT:    kshiftrw $14, %k0, %k0
-; KNL-NEXT:    kmovw %r10d, %k6
+; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    korw %k0, %k6, %k0
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k2, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k3, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k4, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k5, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %r10b
-; KNL-NEXT:    andl $1, %r10d
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
-; KNL-NEXT:    kmovw %edi, %k0
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
+; KNL-NEXT:    andl $1, %edi
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %r10d
+; KNL-NEXT:    kmovw %r10d, %k0
 ; KNL-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL-NEXT:    kshiftrw $14, %k0, %k0
-; KNL-NEXT:    kmovw %r10d, %k6
+; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    korw %k0, %k6, %k0
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k2, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k3, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k4, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k5, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %r10b
-; KNL-NEXT:    andl $1, %r10d
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
-; KNL-NEXT:    kmovw %edi, %k0
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
+; KNL-NEXT:    andl $1, %edi
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %r10d
+; KNL-NEXT:    kmovw %r10d, %k0
 ; KNL-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL-NEXT:    kshiftrw $14, %k0, %k0
-; KNL-NEXT:    kmovw %r10d, %k6
+; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    korw %k0, %k6, %k0
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k2, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k3, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k4, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k5, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %r10b
-; KNL-NEXT:    andl $1, %r10d
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
-; KNL-NEXT:    kmovw %edi, %k0
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
+; KNL-NEXT:    andl $1, %edi
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %r10d
+; KNL-NEXT:    kmovw %r10d, %k0
 ; KNL-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL-NEXT:    kshiftrw $14, %k0, %k0
-; KNL-NEXT:    kmovw %r10d, %k6
+; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    korw %k0, %k6, %k0
 ; KNL-NEXT:    kandw %k1, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k2, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k3, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k4, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k0, %k0
 ; KNL-NEXT:    kandw %k5, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dil
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edi
 ; KNL-NEXT:    kmovw %edi, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $9, %k6, %k6
@@ -2262,51 +2262,51 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL-NEXT:    kshiftrw $11, %k7, %k7
 ; KNL-NEXT:    korw %k7, %k0, %k0
 ; KNL-NEXT:    kandw %k4, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k7
 ; KNL-NEXT:    kshiftlw $15, %k7, %k7
 ; KNL-NEXT:    kshiftrw $10, %k7, %k7
 ; KNL-NEXT:    korw %k7, %k0, %k0
 ; KNL-NEXT:    kandw %k5, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k7
 ; KNL-NEXT:    kshiftlw $15, %k7, %k7
 ; KNL-NEXT:    kshiftrw $9, %k7, %k7
 ; KNL-NEXT:    korw %k7, %k0, %k0
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    andl $1, %ecx
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %dl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %edx
 ; KNL-NEXT:    kmovw %edx, %k7
 ; KNL-NEXT:    kshiftlw $15, %k7, %k7
 ; KNL-NEXT:    kshiftrw $14, %k7, %k7
 ; KNL-NEXT:    kmovw %ecx, %k6
 ; KNL-NEXT:    korw %k7, %k6, %k6
 ; KNL-NEXT:    kandw %k1, %k6, %k1
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k6
 ; KNL-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL-NEXT:    korw %k6, %k1, %k1
 ; KNL-NEXT:    kandw %k2, %k1, %k1
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k2
 ; KNL-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL-NEXT:    kshiftrw $12, %k2, %k2
 ; KNL-NEXT:    korw %k2, %k1, %k1
 ; KNL-NEXT:    kandw %k3, %k1, %k1
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k2
 ; KNL-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL-NEXT:    kshiftrw $11, %k2, %k2
 ; KNL-NEXT:    korw %k2, %k1, %k1
 ; KNL-NEXT:    kandw %k4, %k1, %k1
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k2
 ; KNL-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL-NEXT:    kshiftrw $10, %k2, %k2
 ; KNL-NEXT:    korw %k2, %k1, %k1
 ; KNL-NEXT:    kandw %k5, %k1, %k1
-; KNL-NEXT:    movb {{[0-9]+}}(%rsp), %cl
+; KNL-NEXT:    movzbl {{[0-9]+}}(%rsp), %ecx
 ; KNL-NEXT:    kmovw %ecx, %k2
 ; KNL-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL-NEXT:    kshiftrw $9, %k2, %k2
@@ -2327,38 +2327,38 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 2-byte Reload
 ; KNL-NEXT:    kandw %k1, %k0, %k0
 ; KNL-NEXT:    kshiftrw $6, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %r8d
+; KNL-NEXT:    kmovw %k1, %ecx
 ; KNL-NEXT:    kshiftrw $5, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %r9d
+; KNL-NEXT:    kmovw %k1, %edx
 ; KNL-NEXT:    kshiftrw $4, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %r10d
+; KNL-NEXT:    kmovw %k1, %esi
 ; KNL-NEXT:    kshiftrw $3, %k0, %k1
 ; KNL-NEXT:    kmovw %k1, %edi
 ; KNL-NEXT:    kshiftrw $2, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %ecx
+; KNL-NEXT:    kmovw %k1, %r8d
 ; KNL-NEXT:    kshiftrw $1, %k0, %k1
-; KNL-NEXT:    kmovw %k1, %edx
-; KNL-NEXT:    kmovw %k0, %esi
-; KNL-NEXT:    andb $1, %sil
-; KNL-NEXT:    andb $1, %dl
-; KNL-NEXT:    addb %dl, %dl
-; KNL-NEXT:    orb %sil, %dl
-; KNL-NEXT:    andb $1, %cl
-; KNL-NEXT:    shlb $2, %cl
-; KNL-NEXT:    orb %dl, %cl
+; KNL-NEXT:    kmovw %k1, %r9d
+; KNL-NEXT:    kmovw %k0, %r10d
+; KNL-NEXT:    andb $1, %r10b
+; KNL-NEXT:    andb $1, %r9b
+; KNL-NEXT:    addb %r9b, %r9b
+; KNL-NEXT:    orb %r10b, %r9b
+; KNL-NEXT:    andb $1, %r8b
+; KNL-NEXT:    shlb $2, %r8b
+; KNL-NEXT:    orb %r9b, %r8b
 ; KNL-NEXT:    andb $1, %dil
 ; KNL-NEXT:    shlb $3, %dil
-; KNL-NEXT:    orb %cl, %dil
-; KNL-NEXT:    andb $1, %r10b
-; KNL-NEXT:    shlb $4, %r10b
-; KNL-NEXT:    orb %dil, %r10b
-; KNL-NEXT:    andb $1, %r9b
-; KNL-NEXT:    shlb $5, %r9b
-; KNL-NEXT:    orb %r10b, %r9b
-; KNL-NEXT:    shlb $6, %r8b
-; KNL-NEXT:    orb %r9b, %r8b
-; KNL-NEXT:    andb $127, %r8b
-; KNL-NEXT:    movb %r8b, (%rax)
+; KNL-NEXT:    orb %r8b, %dil
+; KNL-NEXT:    andb $1, %sil
+; KNL-NEXT:    shlb $4, %sil
+; KNL-NEXT:    orb %dil, %sil
+; KNL-NEXT:    andb $1, %dl
+; KNL-NEXT:    shlb $5, %dl
+; KNL-NEXT:    orb %sil, %dl
+; KNL-NEXT:    shlb $6, %cl
+; KNL-NEXT:    orb %dl, %cl
+; KNL-NEXT:    andb $127, %cl
+; KNL-NEXT:    movb %cl, (%rax)
 ; KNL-NEXT:    retq
 ;
 ; SKX-LABEL: test17:
@@ -2380,9 +2380,8 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kshiftrb $5, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
 ; SKX-NEXT:    movb $-9, %dil
-; SKX-NEXT:    kmovd %edi, %k1
-; SKX-NEXT:    kmovw %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; SKX-NEXT:    kandb %k1, %k0, %k0
+; SKX-NEXT:    kmovd %edi, %k6
+; SKX-NEXT:    kandb %k6, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
 ; SKX-NEXT:    kshiftlb $7, %k2, %k2
 ; SKX-NEXT:    kshiftrb $4, %k2, %k2
@@ -2403,13 +2402,14 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kshiftrb $2, %k4, %k4
 ; SKX-NEXT:    korb %k4, %k0, %k0
 ; SKX-NEXT:    movb $-65, %dil
-; SKX-NEXT:    kmovd %edi, %k6
-; SKX-NEXT:    kandb %k6, %k0, %k0
+; SKX-NEXT:    kmovd %edi, %k1
+; SKX-NEXT:    kandb %k1, %k0, %k0
+; SKX-NEXT:    kmovq %k1, %k2
+; SKX-NEXT:    kmovw %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
 ; SKX-NEXT:    kshiftlb $7, %k5, %k5
 ; SKX-NEXT:    kshiftrb $1, %k5, %k5
-; SKX-NEXT:    korb %k5, %k0, %k0
-; SKX-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
+; SKX-NEXT:    korb %k5, %k0, %k5
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
 ; SKX-NEXT:    kshiftlb $7, %k0, %k0
 ; SKX-NEXT:    kshiftrb $6, %k0, %k0
@@ -2417,15 +2417,14 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kshiftlb $7, %k7, %k7
 ; SKX-NEXT:    kshiftrb $7, %k7, %k7
 ; SKX-NEXT:    korb %k0, %k7, %k0
-; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k2 ## 2-byte Reload
-; SKX-NEXT:    kandb %k2, %k0, %k0
+; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k4 ## 2-byte Reload
+; SKX-NEXT:    kandb %k4, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
 ; SKX-NEXT:    kshiftlb $7, %k7, %k7
 ; SKX-NEXT:    kshiftrb $5, %k7, %k7
 ; SKX-NEXT:    korb %k7, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
-; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k5 ## 2-byte Reload
-; SKX-NEXT:    kandb %k5, %k0, %k1
+; SKX-NEXT:    kandb %k6, %k0, %k1
 ; SKX-NEXT:    kshiftlb $7, %k7, %k7
 ; SKX-NEXT:    kshiftrb $4, %k7, %k7
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
@@ -2434,19 +2433,18 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kshiftlb $7, %k0, %k0
 ; SKX-NEXT:    kshiftrb $3, %k0, %k0
 ; SKX-NEXT:    korb %k0, %k1, %k0
-; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k4 ## 2-byte Reload
-; SKX-NEXT:    kandb %k4, %k0, %k0
+; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 2-byte Reload
+; SKX-NEXT:    kandb %k1, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $2, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kandb %k6, %k0, %k0
+; SKX-NEXT:    kandb %k2, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $1, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 2-byte Reload
-; SKX-NEXT:    kandb %k1, %k0, %k0
+; SKX-NEXT:    kandb %k5, %k0, %k0
 ; SKX-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
 ; SKX-NEXT:    kshiftlb $7, %k0, %k0
@@ -2455,29 +2453,31 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $7, %k1, %k1
 ; SKX-NEXT:    korb %k0, %k1, %k0
-; SKX-NEXT:    kandb %k2, %k0, %k0
+; SKX-NEXT:    kmovq %k4, %k2
+; SKX-NEXT:    kandb %k4, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $5, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kmovq %k5, %k7
-; SKX-NEXT:    kandb %k5, %k0, %k0
+; SKX-NEXT:    kmovq %k6, %k7
+; SKX-NEXT:    kmovw %k6, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
+; SKX-NEXT:    kandb %k6, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $4, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kandb %k3, %k0, %k0
-; SKX-NEXT:    kmovw %k3, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $3, %k1, %k1
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
 ; SKX-NEXT:    korb %k1, %k0, %k0
+; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k4 ## 2-byte Reload
 ; SKX-NEXT:    kandb %k4, %k0, %k0
 ; SKX-NEXT:    kshiftlb $7, %k5, %k1
 ; SKX-NEXT:    kshiftrb $2, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kmovw %k6, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
+; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k6 ## 2-byte Reload
 ; SKX-NEXT:    kandb %k6, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
@@ -2515,27 +2515,26 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kandb %k6, %k1, %k1
 ; SKX-NEXT:    kshiftlb $7, %k5, %k5
 ; SKX-NEXT:    kshiftrb $1, %k5, %k5
-; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
-; SKX-NEXT:    korb %k5, %k1, %k5
-; SKX-NEXT:    kshiftlb $7, %k7, %k1
-; SKX-NEXT:    kshiftrb $6, %k1, %k1
-; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
-; SKX-NEXT:    kshiftlb $7, %k7, %k7
-; SKX-NEXT:    kshiftrb $7, %k7, %k7
-; SKX-NEXT:    korb %k1, %k7, %k1
-; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
-; SKX-NEXT:    kandb %k2, %k1, %k1
-; SKX-NEXT:    kshiftlb $7, %k7, %k7
-; SKX-NEXT:    kshiftrb $5, %k7, %k7
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
-; SKX-NEXT:    korb %k7, %k1, %k1
-; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k3 ## 2-byte Reload
-; SKX-NEXT:    kandb %k3, %k1, %k1
+; SKX-NEXT:    korb %k5, %k1, %k7
 ; SKX-NEXT:    kshiftlb $7, %k0, %k0
-; SKX-NEXT:    kshiftrb $4, %k0, %k0
+; SKX-NEXT:    kshiftrb $6, %k0, %k0
+; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; SKX-NEXT:    kshiftlb $7, %k1, %k1
+; SKX-NEXT:    kshiftrb $7, %k1, %k1
 ; SKX-NEXT:    korb %k0, %k1, %k0
-; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k6 ## 2-byte Reload
-; SKX-NEXT:    kandb %k6, %k0, %k0
+; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; SKX-NEXT:    kandb %k2, %k0, %k0
+; SKX-NEXT:    kshiftlb $7, %k1, %k1
+; SKX-NEXT:    kshiftrb $5, %k1, %k1
+; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
+; SKX-NEXT:    korb %k1, %k0, %k0
+; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 2-byte Reload
+; SKX-NEXT:    kandb %k1, %k0, %k0
+; SKX-NEXT:    kshiftlb $7, %k5, %k1
+; SKX-NEXT:    kshiftrb $4, %k1, %k1
+; SKX-NEXT:    korb %k1, %k0, %k0
+; SKX-NEXT:    kandb %k3, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $3, %k1, %k1
@@ -2545,13 +2544,12 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $2, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k2 ## 2-byte Reload
-; SKX-NEXT:    kandb %k2, %k0, %k0
+; SKX-NEXT:    kandb %k6, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $1, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kandb %k5, %k0, %k0
+; SKX-NEXT:    kandb %k7, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k5 ## 2-byte Reload
 ; SKX-NEXT:    kandb %k5, %k0, %k0
@@ -2563,29 +2561,27 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kshiftrb $7, %k1, %k1
 ; SKX-NEXT:    korb %k0, %k1, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k5 ## 2-byte Reload
-; SKX-NEXT:    kandb %k5, %k0, %k0
+; SKX-NEXT:    kandb %k2, %k0, %k0
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $5, %k1, %k1
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kandb %k3, %k0, %k0
+; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k5 ## 2-byte Reload
+; SKX-NEXT:    kandb %k5, %k0, %k0
 ; SKX-NEXT:    kshiftlb $7, %k7, %k1
 ; SKX-NEXT:    kshiftrb $4, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kandb %k6, %k0, %k0
+; SKX-NEXT:    kandb %k3, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $3, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
 ; SKX-NEXT:    kandb %k4, %k0, %k0
-; SKX-NEXT:    kmovq %k4, %k7
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $2, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kandb %k2, %k0, %k0
-; SKX-NEXT:    kmovq %k2, %k3
+; SKX-NEXT:    kandb %k6, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $1, %k1, %k1
@@ -2598,30 +2594,28 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $7, %k1, %k1
 ; SKX-NEXT:    korb %k0, %k1, %k0
-; SKX-NEXT:    kmovq %k5, %k4
-; SKX-NEXT:    kandb %k5, %k0, %k0
+; SKX-NEXT:    kandb %k2, %k0, %k0
+; SKX-NEXT:    kmovq %k2, %k7
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $5, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k5 ## 2-byte Reload
 ; SKX-NEXT:    kandb %k5, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $4, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; SKX-NEXT:    kandb %k6, %k0, %k2
+; SKX-NEXT:    kandb %k3, %k0, %k2
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $3, %k1, %k1
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
 ; SKX-NEXT:    korb %k1, %k2, %k1
-; SKX-NEXT:    kmovq %k7, %k2
-; SKX-NEXT:    kandb %k7, %k1, %k1
+; SKX-NEXT:    kandb %k4, %k1, %k1
 ; SKX-NEXT:    kshiftlb $7, %k0, %k0
 ; SKX-NEXT:    kshiftrb $2, %k0, %k0
 ; SKX-NEXT:    korb %k0, %k1, %k0
-; SKX-NEXT:    kandb %k3, %k0, %k0
+; SKX-NEXT:    kandb %k6, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $1, %k1, %k1
@@ -2636,32 +2630,28 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $7, %k1, %k1
 ; SKX-NEXT:    korb %k0, %k1, %k0
-; SKX-NEXT:    kandb %k4, %k0, %k0
-; SKX-NEXT:    kmovq %k4, %k7
+; SKX-NEXT:    kandb %k7, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $5, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kmovq %k5, %k3
 ; SKX-NEXT:    kandb %k5, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $4, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kandb %k6, %k0, %k0
+; SKX-NEXT:    kandb %k3, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $3, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; SKX-NEXT:    kandb %k2, %k0, %k0
-; SKX-NEXT:    kmovq %k2, %k5
+; SKX-NEXT:    kandb %k4, %k0, %k0
 ; SKX-NEXT:    kshiftlb $7, %k1, %k1
 ; SKX-NEXT:    kshiftrb $2, %k1, %k1
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
 ; SKX-NEXT:    korb %k1, %k0, %k0
-; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k4 ## 2-byte Reload
-; SKX-NEXT:    kandb %k4, %k0, %k0
+; SKX-NEXT:    kandb %k6, %k0, %k0
 ; SKX-NEXT:    kshiftlb $7, %k2, %k1
 ; SKX-NEXT:    kshiftrb $1, %k1, %k1
 ; SKX-NEXT:    korb %k1, %k0, %k0
@@ -2677,22 +2667,22 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kshiftlb $7, %k2, %k2
 ; SKX-NEXT:    kshiftrb $5, %k2, %k2
 ; SKX-NEXT:    korb %k2, %k1, %k1
-; SKX-NEXT:    kandb %k3, %k1, %k1
+; SKX-NEXT:    kandb %k5, %k1, %k1
 ; SKX-NEXT:    kmovd %r8d, %k2
 ; SKX-NEXT:    kshiftlb $7, %k2, %k2
 ; SKX-NEXT:    kshiftrb $4, %k2, %k2
 ; SKX-NEXT:    korb %k2, %k1, %k1
-; SKX-NEXT:    kandb %k6, %k1, %k1
+; SKX-NEXT:    kandb %k3, %k1, %k1
 ; SKX-NEXT:    kmovd %r9d, %k2
 ; SKX-NEXT:    kshiftlb $7, %k2, %k2
 ; SKX-NEXT:    kshiftrb $3, %k2, %k2
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k3
 ; SKX-NEXT:    korb %k2, %k1, %k1
-; SKX-NEXT:    kandb %k5, %k1, %k1
+; SKX-NEXT:    kandb %k4, %k1, %k1
 ; SKX-NEXT:    kshiftlb $7, %k3, %k2
 ; SKX-NEXT:    kshiftrb $2, %k2, %k2
 ; SKX-NEXT:    korb %k2, %k1, %k1
-; SKX-NEXT:    kandb %k4, %k1, %k1
+; SKX-NEXT:    kandb %k6, %k1, %k1
 ; SKX-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
 ; SKX-NEXT:    kshiftlb $7, %k2, %k2
 ; SKX-NEXT:    kshiftrb $1, %k2, %k2
@@ -2705,48 +2695,48 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; SKX-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 2-byte Reload
 ; SKX-NEXT:    kandb %k1, %k0, %k0
 ; SKX-NEXT:    kshiftrb $6, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %r8d
+; SKX-NEXT:    kmovd %k1, %ecx
 ; SKX-NEXT:    kshiftrb $5, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %r9d
+; SKX-NEXT:    kmovd %k1, %edx
 ; SKX-NEXT:    kshiftrb $4, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %r10d
+; SKX-NEXT:    kmovd %k1, %esi
 ; SKX-NEXT:    kshiftrb $3, %k0, %k1
 ; SKX-NEXT:    kmovd %k1, %edi
 ; SKX-NEXT:    kshiftrb $2, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %ecx
+; SKX-NEXT:    kmovd %k1, %r8d
 ; SKX-NEXT:    kshiftrb $1, %k0, %k1
-; SKX-NEXT:    kmovd %k1, %edx
-; SKX-NEXT:    kmovd %k0, %esi
-; SKX-NEXT:    andb $1, %sil
-; SKX-NEXT:    andb $1, %dl
-; SKX-NEXT:    addb %dl, %dl
-; SKX-NEXT:    orb %sil, %dl
-; SKX-NEXT:    andb $1, %cl
-; SKX-NEXT:    shlb $2, %cl
-; SKX-NEXT:    orb %dl, %cl
+; SKX-NEXT:    kmovd %k1, %r9d
+; SKX-NEXT:    kmovd %k0, %r10d
+; SKX-NEXT:    andb $1, %r10b
+; SKX-NEXT:    andb $1, %r9b
+; SKX-NEXT:    addb %r9b, %r9b
+; SKX-NEXT:    orb %r10b, %r9b
+; SKX-NEXT:    andb $1, %r8b
+; SKX-NEXT:    shlb $2, %r8b
+; SKX-NEXT:    orb %r9b, %r8b
 ; SKX-NEXT:    andb $1, %dil
 ; SKX-NEXT:    shlb $3, %dil
-; SKX-NEXT:    orb %cl, %dil
-; SKX-NEXT:    andb $1, %r10b
-; SKX-NEXT:    shlb $4, %r10b
-; SKX-NEXT:    orb %dil, %r10b
-; SKX-NEXT:    andb $1, %r9b
-; SKX-NEXT:    shlb $5, %r9b
-; SKX-NEXT:    orb %r10b, %r9b
-; SKX-NEXT:    shlb $6, %r8b
-; SKX-NEXT:    orb %r9b, %r8b
-; SKX-NEXT:    andb $127, %r8b
-; SKX-NEXT:    movb %r8b, (%rax)
+; SKX-NEXT:    orb %r8b, %dil
+; SKX-NEXT:    andb $1, %sil
+; SKX-NEXT:    shlb $4, %sil
+; SKX-NEXT:    orb %dil, %sil
+; SKX-NEXT:    andb $1, %dl
+; SKX-NEXT:    shlb $5, %dl
+; SKX-NEXT:    orb %sil, %dl
+; SKX-NEXT:    shlb $6, %cl
+; SKX-NEXT:    orb %dl, %cl
+; SKX-NEXT:    andb $127, %cl
+; SKX-NEXT:    movb %cl, (%rax)
 ; SKX-NEXT:    retq
 ;
 ; KNL_X32-LABEL: test17:
 ; KNL_X32:       ## %bb.0:
 ; KNL_X32-NEXT:    pushl %ebx
 ; KNL_X32-NEXT:    subl $16, %esp
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    andl $1, %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k1
 ; KNL_X32-NEXT:    kshiftlw $15, %k1, %k1
 ; KNL_X32-NEXT:    kshiftrw $14, %k1, %k1
@@ -2754,7 +2744,7 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL_X32-NEXT:    movw $-5, %ax
 ; KNL_X32-NEXT:    kmovw %eax, %k1
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k2
 ; KNL_X32-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL_X32-NEXT:    kshiftrw $13, %k2, %k2
@@ -2762,7 +2752,7 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL_X32-NEXT:    movw $-9, %ax
 ; KNL_X32-NEXT:    kmovw %eax, %k2
 ; KNL_X32-NEXT:    kandw %k2, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k3
 ; KNL_X32-NEXT:    kshiftlw $15, %k3, %k3
 ; KNL_X32-NEXT:    kshiftrw $12, %k3, %k3
@@ -2770,7 +2760,7 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL_X32-NEXT:    movw $-17, %ax
 ; KNL_X32-NEXT:    kmovw %eax, %k3
 ; KNL_X32-NEXT:    kandw %k3, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k4
 ; KNL_X32-NEXT:    kshiftlw $15, %k4, %k4
 ; KNL_X32-NEXT:    kshiftrw $11, %k4, %k4
@@ -2778,7 +2768,7 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL_X32-NEXT:    movw $-33, %ax
 ; KNL_X32-NEXT:    kmovw %eax, %k4
 ; KNL_X32-NEXT:    kandw %k4, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k5
 ; KNL_X32-NEXT:    kshiftlw $15, %k5, %k5
 ; KNL_X32-NEXT:    kshiftrw $10, %k5, %k5
@@ -2786,318 +2776,318 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; KNL_X32-NEXT:    movw $-65, %ax
 ; KNL_X32-NEXT:    kmovw %eax, %k5
 ; KNL_X32-NEXT:    kandw %k5, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %k0, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    andl $1, %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $14, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k2, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k3, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k4, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k5, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %k0, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    andl $1, %eax
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %cl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %ecx
 ; KNL_X32-NEXT:    kmovw %ecx, %k0
 ; KNL_X32-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL_X32-NEXT:    kshiftrw $14, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    korw %k0, %k6, %k0
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k2, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k3, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k4, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k5, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %k0, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    andl $1, %eax
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %cl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %ecx
 ; KNL_X32-NEXT:    kmovw %ecx, %k0
 ; KNL_X32-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL_X32-NEXT:    kshiftrw $14, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    korw %k0, %k6, %k0
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k2, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k3, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k4, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k5, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %k0, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    andl $1, %eax
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %cl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %ecx
 ; KNL_X32-NEXT:    kmovw %ecx, %k0
 ; KNL_X32-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL_X32-NEXT:    kshiftrw $14, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    korw %k0, %k6, %k0
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k2, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k3, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k4, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k5, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %k0, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    andl $1, %eax
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %cl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %ecx
 ; KNL_X32-NEXT:    kmovw %ecx, %k0
 ; KNL_X32-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL_X32-NEXT:    kshiftrw $14, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    korw %k0, %k6, %k0
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k2, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k3, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k4, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k5, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %k0, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    andl $1, %eax
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %cl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %ecx
 ; KNL_X32-NEXT:    kmovw %ecx, %k0
 ; KNL_X32-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL_X32-NEXT:    kshiftrw $14, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    korw %k0, %k6, %k0
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k2, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $12, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k3, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $11, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k4, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $10, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k5, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $9, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %k0, {{[-0-9]+}}(%e{{[sb]}}p) ## 2-byte Spill
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    andl $1, %eax
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %cl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %ecx
 ; KNL_X32-NEXT:    kmovw %ecx, %k0
 ; KNL_X32-NEXT:    kshiftlw $15, %k0, %k0
 ; KNL_X32-NEXT:    kshiftrw $14, %k0, %k0
 ; KNL_X32-NEXT:    kmovw %eax, %k7
 ; KNL_X32-NEXT:    korw %k0, %k7, %k0
 ; KNL_X32-NEXT:    kandw %k1, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k7
 ; KNL_X32-NEXT:    kshiftlw $15, %k7, %k7
 ; KNL_X32-NEXT:    kshiftrw $13, %k7, %k7
 ; KNL_X32-NEXT:    korw %k7, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k2, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k7
 ; KNL_X32-NEXT:    kshiftlw $15, %k7, %k7
 ; KNL_X32-NEXT:    kshiftrw $12, %k7, %k7
 ; KNL_X32-NEXT:    korw %k7, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k3, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k7
 ; KNL_X32-NEXT:    kshiftlw $15, %k7, %k7
 ; KNL_X32-NEXT:    kshiftrw $11, %k7, %k7
 ; KNL_X32-NEXT:    korw %k7, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k4, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k7
 ; KNL_X32-NEXT:    kshiftlw $15, %k7, %k7
 ; KNL_X32-NEXT:    kshiftrw $10, %k7, %k7
 ; KNL_X32-NEXT:    korw %k7, %k0, %k0
 ; KNL_X32-NEXT:    kandw %k5, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k7
 ; KNL_X32-NEXT:    kshiftlw $15, %k7, %k7
 ; KNL_X32-NEXT:    kshiftrw $9, %k7, %k7
 ; KNL_X32-NEXT:    korw %k7, %k0, %k0
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    andl $1, %eax
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %cl
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %ecx
 ; KNL_X32-NEXT:    kmovw %ecx, %k7
 ; KNL_X32-NEXT:    kshiftlw $15, %k7, %k7
 ; KNL_X32-NEXT:    kshiftrw $14, %k7, %k7
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    korw %k7, %k6, %k6
 ; KNL_X32-NEXT:    kandw %k1, %k6, %k1
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k6
 ; KNL_X32-NEXT:    kshiftlw $15, %k6, %k6
 ; KNL_X32-NEXT:    kshiftrw $13, %k6, %k6
 ; KNL_X32-NEXT:    korw %k6, %k1, %k1
 ; KNL_X32-NEXT:    kandw %k2, %k1, %k1
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k2
 ; KNL_X32-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL_X32-NEXT:    kshiftrw $12, %k2, %k2
 ; KNL_X32-NEXT:    korw %k2, %k1, %k1
 ; KNL_X32-NEXT:    kandw %k3, %k1, %k1
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k2
 ; KNL_X32-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL_X32-NEXT:    kshiftrw $11, %k2, %k2
 ; KNL_X32-NEXT:    korw %k2, %k1, %k1
 ; KNL_X32-NEXT:    kandw %k4, %k1, %k1
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k2
 ; KNL_X32-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL_X32-NEXT:    kshiftrw $10, %k2, %k2
 ; KNL_X32-NEXT:    korw %k2, %k1, %k1
 ; KNL_X32-NEXT:    kandw %k5, %k1, %k1
-; KNL_X32-NEXT:    movb {{[0-9]+}}(%esp), %al
+; KNL_X32-NEXT:    movzbl {{[0-9]+}}(%esp), %eax
 ; KNL_X32-NEXT:    kmovw %eax, %k2
 ; KNL_X32-NEXT:    kshiftlw $15, %k2, %k2
 ; KNL_X32-NEXT:    kshiftrw $9, %k2, %k2
@@ -3189,129 +3179,131 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; FASTISEL-NEXT:    kshiftrb $3, %k2, %k2
 ; FASTISEL-NEXT:    korb %k2, %k0, %k0
 ; FASTISEL-NEXT:    movb $-33, %dil
-; FASTISEL-NEXT:    kmovd %edi, %k5
-; FASTISEL-NEXT:    kandb %k5, %k0, %k0
+; FASTISEL-NEXT:    kmovd %edi, %k6
+; FASTISEL-NEXT:    kandb %k6, %k0, %k0
+; FASTISEL-NEXT:    kmovw %k6, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k4
 ; FASTISEL-NEXT:    kshiftlb $7, %k4, %k4
 ; FASTISEL-NEXT:    kshiftrb $2, %k4, %k4
 ; FASTISEL-NEXT:    korb %k4, %k0, %k0
 ; FASTISEL-NEXT:    movb $-65, %dil
-; FASTISEL-NEXT:    kmovd %edi, %k1
-; FASTISEL-NEXT:    kandb %k1, %k0, %k0
-; FASTISEL-NEXT:    kmovq %k1, %k4
-; FASTISEL-NEXT:    kmovw %k1, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k6
-; FASTISEL-NEXT:    kshiftlb $7, %k6, %k6
-; FASTISEL-NEXT:    kshiftrb $1, %k6, %k6
-; FASTISEL-NEXT:    korb %k6, %k0, %k1
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k6
-; FASTISEL-NEXT:    kshiftlb $7, %k6, %k6
-; FASTISEL-NEXT:    kshiftrb $6, %k6, %k6
+; FASTISEL-NEXT:    kmovd %edi, %k2
+; FASTISEL-NEXT:    kandb %k2, %k0, %k0
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
+; FASTISEL-NEXT:    kshiftlb $7, %k5, %k5
+; FASTISEL-NEXT:    kshiftrb $1, %k5, %k5
+; FASTISEL-NEXT:    korb %k5, %k0, %k0
+; FASTISEL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
+; FASTISEL-NEXT:    kshiftlb $7, %k0, %k0
+; FASTISEL-NEXT:    kshiftrb $6, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
 ; FASTISEL-NEXT:    kshiftlb $7, %k7, %k7
 ; FASTISEL-NEXT:    kshiftrb $7, %k7, %k7
-; FASTISEL-NEXT:    korb %k6, %k7, %k6
-; FASTISEL-NEXT:    kandb %k3, %k6, %k6
+; FASTISEL-NEXT:    korb %k0, %k7, %k0
+; FASTISEL-NEXT:    kandb %k3, %k0, %k0
+; FASTISEL-NEXT:    kmovq %k3, %k5
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
 ; FASTISEL-NEXT:    kshiftlb $7, %k7, %k7
 ; FASTISEL-NEXT:    kshiftrb $5, %k7, %k7
-; FASTISEL-NEXT:    korb %k7, %k6, %k6
+; FASTISEL-NEXT:    korb %k7, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
-; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k2 ## 2-byte Reload
-; FASTISEL-NEXT:    kandb %k2, %k6, %k6
+; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k4 ## 2-byte Reload
+; FASTISEL-NEXT:    kandb %k4, %k0, %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k7, %k7
 ; FASTISEL-NEXT:    kshiftrb $4, %k7, %k7
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
-; FASTISEL-NEXT:    korb %k7, %k6, %k6
-; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k7 ## 2-byte Reload
-; FASTISEL-NEXT:    kandb %k7, %k6, %k6
+; FASTISEL-NEXT:    korb %k7, %k1, %k1
+; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k3 ## 2-byte Reload
+; FASTISEL-NEXT:    kandb %k3, %k1, %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k0, %k0
 ; FASTISEL-NEXT:    kshiftrb $3, %k0, %k0
-; FASTISEL-NEXT:    korb %k0, %k6, %k0
-; FASTISEL-NEXT:    kandb %k5, %k0, %k0
-; FASTISEL-NEXT:    kmovw %k5, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k6
-; FASTISEL-NEXT:    kshiftlb $7, %k6, %k6
-; FASTISEL-NEXT:    kshiftrb $2, %k6, %k6
-; FASTISEL-NEXT:    korb %k6, %k0, %k0
-; FASTISEL-NEXT:    kandb %k4, %k0, %k0
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k6
-; FASTISEL-NEXT:    kshiftlb $7, %k6, %k6
-; FASTISEL-NEXT:    kshiftrb $1, %k6, %k6
-; FASTISEL-NEXT:    korb %k6, %k0, %k0
-; FASTISEL-NEXT:    kandb %k1, %k0, %k0
-; FASTISEL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
-; FASTISEL-NEXT:    kshiftlb $7, %k0, %k0
-; FASTISEL-NEXT:    kshiftrb $6, %k0, %k0
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
-; FASTISEL-NEXT:    kshiftrb $7, %k1, %k1
 ; FASTISEL-NEXT:    korb %k0, %k1, %k0
-; FASTISEL-NEXT:    kmovq %k3, %k7
-; FASTISEL-NEXT:    kandb %k3, %k0, %k0
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
-; FASTISEL-NEXT:    kshiftrb $5, %k1, %k1
-; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kandb %k2, %k0, %k0
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
-; FASTISEL-NEXT:    kshiftrb $4, %k1, %k1
-; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k4 ## 2-byte Reload
-; FASTISEL-NEXT:    kandb %k4, %k0, %k0
-; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
-; FASTISEL-NEXT:    kshiftrb $3, %k1, %k1
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k6
-; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kandb %k5, %k0, %k0
-; FASTISEL-NEXT:    kshiftlb $7, %k6, %k1
-; FASTISEL-NEXT:    kshiftrb $2, %k1, %k1
-; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k3 ## 2-byte Reload
-; FASTISEL-NEXT:    kandb %k3, %k0, %k0
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
-; FASTISEL-NEXT:    kshiftrb $1, %k1, %k1
-; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kshiftlb $7, %k0, %k0
-; FASTISEL-NEXT:    kshiftrb $6, %k0, %k0
-; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
-; FASTISEL-NEXT:    kshiftrb $7, %k1, %k1
-; FASTISEL-NEXT:    korb %k0, %k1, %k0
-; FASTISEL-NEXT:    kandb %k7, %k0, %k0
-; FASTISEL-NEXT:    kmovq %k7, %k5
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
-; FASTISEL-NEXT:    kshiftrb $5, %k1, %k1
-; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kandb %k2, %k0, %k0
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
-; FASTISEL-NEXT:    kshiftrb $4, %k1, %k1
-; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kandb %k4, %k0, %k0
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
-; FASTISEL-NEXT:    kshiftrb $3, %k1, %k1
-; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k6 ## 2-byte Reload
 ; FASTISEL-NEXT:    kandb %k6, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $2, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
+; FASTISEL-NEXT:    kandb %k2, %k0, %k0
+; FASTISEL-NEXT:    kmovq %k2, %k6
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $1, %k1, %k1
+; FASTISEL-NEXT:    korb %k1, %k0, %k0
+; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 2-byte Reload
+; FASTISEL-NEXT:    kandb %k1, %k0, %k0
+; FASTISEL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
+; FASTISEL-NEXT:    kshiftlb $7, %k0, %k0
+; FASTISEL-NEXT:    kshiftrb $6, %k0, %k0
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $7, %k1, %k1
+; FASTISEL-NEXT:    korb %k0, %k1, %k0
+; FASTISEL-NEXT:    kmovq %k5, %k2
+; FASTISEL-NEXT:    kandb %k5, %k0, %k0
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $5, %k1, %k1
+; FASTISEL-NEXT:    korb %k1, %k0, %k0
+; FASTISEL-NEXT:    kmovq %k4, %k7
+; FASTISEL-NEXT:    kandb %k4, %k0, %k0
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $4, %k1, %k1
+; FASTISEL-NEXT:    korb %k1, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kandb %k3, %k0, %k0
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $3, %k1, %k1
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
+; FASTISEL-NEXT:    korb %k1, %k0, %k0
+; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k4 ## 2-byte Reload
+; FASTISEL-NEXT:    kandb %k4, %k0, %k0
+; FASTISEL-NEXT:    kshiftlb $7, %k5, %k1
+; FASTISEL-NEXT:    kshiftrb $2, %k1, %k1
+; FASTISEL-NEXT:    korb %k1, %k0, %k0
+; FASTISEL-NEXT:    kandb %k6, %k0, %k0
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $1, %k1, %k1
+; FASTISEL-NEXT:    korb %k1, %k0, %k0
+; FASTISEL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $6, %k1, %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k5, %k5
+; FASTISEL-NEXT:    kshiftrb $7, %k5, %k5
+; FASTISEL-NEXT:    korb %k1, %k5, %k1
+; FASTISEL-NEXT:    kandb %k2, %k1, %k1
+; FASTISEL-NEXT:    kmovw %k2, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
+; FASTISEL-NEXT:    kshiftlb $7, %k5, %k5
+; FASTISEL-NEXT:    kshiftrb $5, %k5, %k5
+; FASTISEL-NEXT:    korb %k5, %k1, %k1
+; FASTISEL-NEXT:    kandb %k7, %k1, %k1
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
+; FASTISEL-NEXT:    kshiftlb $7, %k5, %k5
+; FASTISEL-NEXT:    kshiftrb $4, %k5, %k5
+; FASTISEL-NEXT:    korb %k5, %k1, %k1
+; FASTISEL-NEXT:    kandb %k3, %k1, %k1
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
+; FASTISEL-NEXT:    kshiftlb $7, %k5, %k5
+; FASTISEL-NEXT:    kshiftrb $3, %k5, %k5
+; FASTISEL-NEXT:    korb %k5, %k1, %k1
+; FASTISEL-NEXT:    kandb %k4, %k1, %k1
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
+; FASTISEL-NEXT:    kshiftlb $7, %k5, %k5
+; FASTISEL-NEXT:    kshiftrb $2, %k5, %k5
+; FASTISEL-NEXT:    korb %k5, %k1, %k1
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k5
+; FASTISEL-NEXT:    kandb %k6, %k1, %k1
+; FASTISEL-NEXT:    kmovw %k6, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
+; FASTISEL-NEXT:    kshiftlb $7, %k5, %k5
+; FASTISEL-NEXT:    kshiftrb $1, %k5, %k5
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
-; FASTISEL-NEXT:    korb %k1, %k0, %k2
+; FASTISEL-NEXT:    korb %k5, %k1, %k5
 ; FASTISEL-NEXT:    kshiftlb $7, %k7, %k1
 ; FASTISEL-NEXT:    kshiftrb $6, %k1, %k1
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
@@ -3319,35 +3311,36 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; FASTISEL-NEXT:    kshiftrb $7, %k7, %k7
 ; FASTISEL-NEXT:    korb %k1, %k7, %k1
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
-; FASTISEL-NEXT:    kandb %k5, %k1, %k1
+; FASTISEL-NEXT:    kandb %k2, %k1, %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k7, %k7
 ; FASTISEL-NEXT:    kshiftrb $5, %k7, %k7
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
 ; FASTISEL-NEXT:    korb %k7, %k1, %k1
-; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k7 ## 2-byte Reload
-; FASTISEL-NEXT:    kandb %k7, %k1, %k1
+; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k3 ## 2-byte Reload
+; FASTISEL-NEXT:    kandb %k3, %k1, %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k0, %k0
 ; FASTISEL-NEXT:    kshiftrb $4, %k0, %k0
 ; FASTISEL-NEXT:    korb %k0, %k1, %k0
-; FASTISEL-NEXT:    kandb %k4, %k0, %k0
+; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k2 ## 2-byte Reload
+; FASTISEL-NEXT:    kandb %k2, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $3, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kandb %k6, %k0, %k0
+; FASTISEL-NEXT:    kandb %k4, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $2, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kandb %k3, %k0, %k0
+; FASTISEL-NEXT:    kandb %k6, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $1, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kandb %k2, %k0, %k0
+; FASTISEL-NEXT:    kandb %k5, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k2 ## 2-byte Reload
-; FASTISEL-NEXT:    kandb %k2, %k0, %k0
+; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k5 ## 2-byte Reload
+; FASTISEL-NEXT:    kandb %k5, %k0, %k0
 ; FASTISEL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k0
 ; FASTISEL-NEXT:    kshiftrb $6, %k0, %k0
@@ -3356,69 +3349,33 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; FASTISEL-NEXT:    kshiftrb $7, %k1, %k1
 ; FASTISEL-NEXT:    korb %k0, %k1, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kmovq %k5, %k3
-; FASTISEL-NEXT:    kmovw %k5, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
-; FASTISEL-NEXT:    kandb %k5, %k0, %k0
+; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k6 ## 2-byte Reload
+; FASTISEL-NEXT:    kandb %k6, %k0, %k0
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $5, %k1, %k1
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kandb %k7, %k0, %k0
-; FASTISEL-NEXT:    kshiftlb $7, %k2, %k1
+; FASTISEL-NEXT:    kandb %k3, %k0, %k0
+; FASTISEL-NEXT:    kshiftlb $7, %k7, %k1
 ; FASTISEL-NEXT:    kshiftrb $4, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kmovq %k4, %k5
-; FASTISEL-NEXT:    kandb %k4, %k0, %k0
+; FASTISEL-NEXT:    kandb %k2, %k0, %k0
+; FASTISEL-NEXT:    kmovq %k2, %k7
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $3, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kandb %k6, %k0, %k0
+; FASTISEL-NEXT:    kandb %k4, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $2, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k4 ## 2-byte Reload
-; FASTISEL-NEXT:    kandb %k4, %k0, %k0
+; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k5 ## 2-byte Reload
+; FASTISEL-NEXT:    kandb %k5, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $1, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
-; FASTISEL-NEXT:    kshiftrb $6, %k1, %k1
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
-; FASTISEL-NEXT:    kshiftlb $7, %k2, %k2
-; FASTISEL-NEXT:    kshiftrb $7, %k2, %k2
-; FASTISEL-NEXT:    korb %k1, %k2, %k1
-; FASTISEL-NEXT:    kandb %k3, %k1, %k1
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
-; FASTISEL-NEXT:    kshiftlb $7, %k2, %k2
-; FASTISEL-NEXT:    kshiftrb $5, %k2, %k2
-; FASTISEL-NEXT:    korb %k2, %k1, %k1
-; FASTISEL-NEXT:    kandb %k7, %k1, %k1
-; FASTISEL-NEXT:    kmovq %k7, %k3
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
-; FASTISEL-NEXT:    kshiftlb $7, %k2, %k2
-; FASTISEL-NEXT:    kshiftrb $4, %k2, %k2
-; FASTISEL-NEXT:    korb %k2, %k1, %k1
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
-; FASTISEL-NEXT:    kandb %k5, %k1, %k1
-; FASTISEL-NEXT:    kshiftlb $7, %k2, %k2
-; FASTISEL-NEXT:    kshiftrb $3, %k2, %k2
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k7
-; FASTISEL-NEXT:    korb %k2, %k1, %k1
-; FASTISEL-NEXT:    kandb %k6, %k1, %k1
-; FASTISEL-NEXT:    kmovq %k6, %k5
-; FASTISEL-NEXT:    kshiftlb $7, %k7, %k2
-; FASTISEL-NEXT:    kshiftrb $2, %k2, %k2
-; FASTISEL-NEXT:    korb %k2, %k1, %k1
-; FASTISEL-NEXT:    kandb %k4, %k1, %k1
-; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
-; FASTISEL-NEXT:    kshiftlb $7, %k2, %k2
-; FASTISEL-NEXT:    kshiftrb $1, %k2, %k2
-; FASTISEL-NEXT:    korb %k2, %k1, %k1
-; FASTISEL-NEXT:    kandb %k0, %k1, %k0
 ; FASTISEL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
 ; FASTISEL-NEXT:    kshiftlb $7, %k0, %k0
@@ -3427,8 +3384,7 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $7, %k1, %k1
 ; FASTISEL-NEXT:    korb %k0, %k1, %k0
-; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k7 ## 2-byte Reload
-; FASTISEL-NEXT:    kandb %k7, %k0, %k0
+; FASTISEL-NEXT:    kandb %k6, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $5, %k1, %k1
@@ -3438,19 +3394,53 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $4, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k6 ## 2-byte Reload
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kandb %k2, %k0, %k2
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $3, %k1, %k1
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
+; FASTISEL-NEXT:    korb %k1, %k2, %k1
+; FASTISEL-NEXT:    kandb %k4, %k1, %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k0, %k0
+; FASTISEL-NEXT:    kshiftrb $2, %k0, %k0
+; FASTISEL-NEXT:    korb %k0, %k1, %k0
+; FASTISEL-NEXT:    kandb %k5, %k0, %k0
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $1, %k1, %k1
+; FASTISEL-NEXT:    korb %k1, %k0, %k0
+; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 2-byte Reload
+; FASTISEL-NEXT:    kandb %k1, %k0, %k0
+; FASTISEL-NEXT:    kmovw %k0, {{[-0-9]+}}(%r{{[sb]}}p) ## 2-byte Spill
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k0
+; FASTISEL-NEXT:    kshiftlb $7, %k0, %k0
+; FASTISEL-NEXT:    kshiftrb $6, %k0, %k0
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $7, %k1, %k1
+; FASTISEL-NEXT:    korb %k0, %k1, %k0
 ; FASTISEL-NEXT:    kandb %k6, %k0, %k0
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $5, %k1, %k1
+; FASTISEL-NEXT:    korb %k1, %k0, %k0
+; FASTISEL-NEXT:    kandb %k3, %k0, %k0
+; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
+; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
+; FASTISEL-NEXT:    kshiftrb $4, %k1, %k1
+; FASTISEL-NEXT:    korb %k1, %k0, %k0
+; FASTISEL-NEXT:    kandb %k7, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $3, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k1
-; FASTISEL-NEXT:    kandb %k5, %k0, %k0
+; FASTISEL-NEXT:    kandb %k4, %k0, %k0
 ; FASTISEL-NEXT:    kshiftlb $7, %k1, %k1
 ; FASTISEL-NEXT:    kshiftrb $2, %k1, %k1
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
-; FASTISEL-NEXT:    kandb %k4, %k0, %k0
+; FASTISEL-NEXT:    kandb %k5, %k0, %k0
 ; FASTISEL-NEXT:    kshiftlb $7, %k2, %k1
 ; FASTISEL-NEXT:    kshiftrb $1, %k1, %k1
 ; FASTISEL-NEXT:    korb %k1, %k0, %k0
@@ -3461,7 +3451,7 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; FASTISEL-NEXT:    kshiftlb $7, %k2, %k2
 ; FASTISEL-NEXT:    kshiftrb $7, %k2, %k2
 ; FASTISEL-NEXT:    korb %k1, %k2, %k1
-; FASTISEL-NEXT:    kandb %k7, %k1, %k1
+; FASTISEL-NEXT:    kandb %k6, %k1, %k1
 ; FASTISEL-NEXT:    kmovd %ecx, %k2
 ; FASTISEL-NEXT:    kshiftlb $7, %k2, %k2
 ; FASTISEL-NEXT:    kshiftrb $5, %k2, %k2
@@ -3471,17 +3461,17 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; FASTISEL-NEXT:    kshiftlb $7, %k2, %k2
 ; FASTISEL-NEXT:    kshiftrb $4, %k2, %k2
 ; FASTISEL-NEXT:    korb %k2, %k1, %k1
-; FASTISEL-NEXT:    kandb %k6, %k1, %k1
+; FASTISEL-NEXT:    kandb %k7, %k1, %k1
 ; FASTISEL-NEXT:    kmovd %r9d, %k2
 ; FASTISEL-NEXT:    kshiftlb $7, %k2, %k2
 ; FASTISEL-NEXT:    kshiftrb $3, %k2, %k2
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k3
 ; FASTISEL-NEXT:    korb %k2, %k1, %k1
-; FASTISEL-NEXT:    kandb %k5, %k1, %k1
+; FASTISEL-NEXT:    kandb %k4, %k1, %k1
 ; FASTISEL-NEXT:    kshiftlb $7, %k3, %k2
 ; FASTISEL-NEXT:    kshiftrb $2, %k2, %k2
 ; FASTISEL-NEXT:    korb %k2, %k1, %k1
-; FASTISEL-NEXT:    kandb %k4, %k1, %k1
+; FASTISEL-NEXT:    kandb %k5, %k1, %k1
 ; FASTISEL-NEXT:    kmovb {{[0-9]+}}(%rsp), %k2
 ; FASTISEL-NEXT:    kshiftlb $7, %k2, %k2
 ; FASTISEL-NEXT:    kshiftrb $1, %k2, %k2
@@ -3494,38 +3484,38 @@ define <7 x i1> @test17(<7 x i1> %a, <7 x i1> %b, <7 x i1> %c, <7 x i1> %d, <7 x
 ; FASTISEL-NEXT:    kmovw {{[-0-9]+}}(%r{{[sb]}}p), %k1 ## 2-byte Reload
 ; FASTISEL-NEXT:    kandb %k1, %k0, %k0
 ; FASTISEL-NEXT:    kshiftrb $6, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %r8d
+; FASTISEL-NEXT:    kmovd %k1, %ecx
 ; FASTISEL-NEXT:    kshiftrb $5, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %r9d
+; FASTISEL-NEXT:    kmovd %k1, %edx
 ; FASTISEL-NEXT:    kshiftrb $4, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %r10d
+; FASTISEL-NEXT:    kmovd %k1, %esi
 ; FASTISEL-NEXT:    kshiftrb $3, %k0, %k1
 ; FASTISEL-NEXT:    kmovd %k1, %edi
 ; FASTISEL-NEXT:    kshiftrb $2, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %ecx
+; FASTISEL-NEXT:    kmovd %k1, %r8d
 ; FASTISEL-NEXT:    kshiftrb $1, %k0, %k1
-; FASTISEL-NEXT:    kmovd %k1, %edx
-; FASTISEL-NEXT:    kmovd %k0, %esi
-; FASTISEL-NEXT:    andb $1, %sil
-; FASTISEL-NEXT:    andb $1, %dl
-; FASTISEL-NEXT:    addb %dl, %dl
-; FASTISEL-NEXT:    orb %sil, %dl
-; FASTISEL-NEXT:    andb $1, %cl
-; FASTISEL-NEXT:    shlb $2, %cl
-; FASTISEL-NEXT:    orb %dl, %cl
+; FASTISEL-NEXT:    kmovd %k1, %r9d
+; FASTISEL-NEXT:    kmovd %k0, %r10d
+; FASTISEL-NEXT:    andb $1, %r10b
+; FASTISEL-NEXT:    andb $1, %r9b
+; FASTISEL-NEXT:    addb %r9b, %r9b
+; FASTISEL-NEXT:    orb %r10b, %r9b
+; FASTISEL-NEXT:    andb $1, %r8b
+; FASTISEL-NEXT:    shlb $2, %r8b
+; FASTISEL-NEXT:    orb %r9b, %r8b
 ; FASTISEL-NEXT:    andb $1, %dil
 ; FASTISEL-NEXT:    shlb $3, %dil
-; FASTISEL-NEXT:    orb %cl, %dil
-; FASTISEL-NEXT:    andb $1, %r10b
-; FASTISEL-NEXT:    shlb $4, %r10b
-; FASTISEL-NEXT:    orb %dil, %r10b
-; FASTISEL-NEXT:    andb $1, %r9b
-; FASTISEL-NEXT:    shlb $5, %r9b
-; FASTISEL-NEXT:    orb %r10b, %r9b
-; FASTISEL-NEXT:    shlb $6, %r8b
-; FASTISEL-NEXT:    orb %r9b, %r8b
-; FASTISEL-NEXT:    andb $127, %r8b
-; FASTISEL-NEXT:    movb %r8b, (%rax)
+; FASTISEL-NEXT:    orb %r8b, %dil
+; FASTISEL-NEXT:    andb $1, %sil
+; FASTISEL-NEXT:    shlb $4, %sil
+; FASTISEL-NEXT:    orb %dil, %sil
+; FASTISEL-NEXT:    andb $1, %dl
+; FASTISEL-NEXT:    shlb $5, %dl
+; FASTISEL-NEXT:    orb %sil, %dl
+; FASTISEL-NEXT:    shlb $6, %cl
+; FASTISEL-NEXT:    orb %dl, %cl
+; FASTISEL-NEXT:    andb $127, %cl
+; FASTISEL-NEXT:    movb %cl, (%rax)
 ; FASTISEL-NEXT:    retq
   %j = and <7 x i1> %a, %b
   %k = and <7 x i1> %j, %c

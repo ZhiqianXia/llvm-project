@@ -60,11 +60,9 @@
 #include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/Predicate.h"
-#include "lldb/Utility/ReproducerProvider.h"
 #include "lldb/Utility/Status.h"
 #include "lldb/lldb-private-forward.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Errno.h"
 #include "llvm/Support/FileSystem.h"
 
@@ -91,7 +89,39 @@ using namespace lldb;
 using namespace lldb_private;
 
 #if !defined(__APPLE__)
-void Host::SystemLog(llvm::StringRef message) { llvm::errs() << message; }
+#if !defined(_WIN32)
+#include <syslog.h>
+void Host::SystemLog(Severity severity, llvm::StringRef message) {
+  static llvm::once_flag g_openlog_once;
+  llvm::call_once(g_openlog_once,
+                  [] { openlog("lldb", LOG_PID | LOG_NDELAY, LOG_USER); });
+  int level = LOG_DEBUG;
+  switch (severity) {
+  case lldb::eSeverityInfo:
+    level = LOG_INFO;
+    break;
+  case lldb::eSeverityWarning:
+    level = LOG_WARNING;
+    break;
+  case lldb::eSeverityError:
+    level = LOG_ERR;
+    break;
+  }
+  syslog(level, "%s", message.data());
+}
+#else
+void Host::SystemLog(Severity severity, llvm::StringRef message) {
+  switch (severity) {
+  case lldb::eSeverityInfo:
+  case lldb::eSeverityWarning:
+    llvm::outs() << message;
+    break;
+  case lldb::eSeverityError:
+    llvm::errs() << message;
+    break;
+  }
+}
+#endif
 #endif
 
 #if !defined(__APPLE__) && !defined(_WIN32)
@@ -135,11 +165,7 @@ private:
 #endif // __linux__
 
 #ifdef __linux__
-#if defined(__GNUC__) && (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 8))
-static __thread volatile sig_atomic_t g_usr1_called;
-#else
 static thread_local volatile sig_atomic_t g_usr1_called;
-#endif
 
 static void SigUsr1Handler(int) { g_usr1_called = 1; }
 #endif // __linux__
@@ -172,7 +198,7 @@ MonitorChildProcessThreadFunction(::pid_t pid,
   ::sigaction(SIGUSR1, &sigUsr1Action, nullptr);
 #endif // __linux__
 
-  while(1) {
+  while (true) {
     log = GetLog(LLDBLog::Process);
     LLDB_LOG(log, "::waitpid({0}, &status, 0)...", pid);
 
@@ -548,9 +574,11 @@ void Host::Kill(lldb::pid_t pid, int signo) { ::kill(pid, signo); }
 #endif
 
 #if !defined(__APPLE__)
-bool Host::OpenFileInExternalEditor(const FileSpec &file_spec,
-                                    uint32_t line_no) {
-  return false;
+llvm::Error Host::OpenFileInExternalEditor(llvm::StringRef editor,
+                                           const FileSpec &file_spec,
+                                           uint32_t line_no) {
+  return llvm::errorCodeToError(
+      std::error_code(ENOTSUP, std::system_category()));
 }
 
 bool Host::IsInteractiveGraphicSession() { return false; }
@@ -558,7 +586,7 @@ bool Host::IsInteractiveGraphicSession() { return false; }
 
 std::unique_ptr<Connection> Host::CreateDefaultConnection(llvm::StringRef url) {
 #if defined(_WIN32)
-  if (url.startswith("file://"))
+  if (url.starts_with("file://"))
     return std::unique_ptr<Connection>(new ConnectionGenericFile());
 #endif
   return std::unique_ptr<Connection>(new ConnectionFileDescriptor());
@@ -614,22 +642,7 @@ void llvm::format_provider<WaitStatus>::format(const WaitStatus &WS,
 
 uint32_t Host::FindProcesses(const ProcessInstanceInfoMatch &match_info,
                              ProcessInstanceInfoList &process_infos) {
-
-  if (llvm::Optional<ProcessInstanceInfoList> infos =
-          repro::GetReplayProcessInstanceInfoList()) {
-    process_infos = *infos;
-    return process_infos.size();
-  }
-
-  uint32_t result = FindProcessesImpl(match_info, process_infos);
-
-  if (repro::Generator *g = repro::Reproducer::Instance().GetGenerator()) {
-    g->GetOrCreate<repro::ProcessInfoProvider>()
-        .GetNewProcessInfoRecorder()
-        ->Record(process_infos);
-  }
-
-  return result;
+  return FindProcessesImpl(match_info, process_infos);
 }
 
 char SystemLogHandler::ID;
@@ -637,5 +650,5 @@ char SystemLogHandler::ID;
 SystemLogHandler::SystemLogHandler() {}
 
 void SystemLogHandler::Emit(llvm::StringRef message) {
-  Host::SystemLog(message);
+  Host::SystemLog(lldb::eSeverityInfo, message);
 }

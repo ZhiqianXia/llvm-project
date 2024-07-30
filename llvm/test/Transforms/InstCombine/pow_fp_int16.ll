@@ -51,7 +51,7 @@ define double @pow_uitofp_double_const_base_fast(i15 %x) {
 
 define double @pow_sitofp_double_const_base_2_fast(i16 %x) {
 ; CHECK-LABEL: @pow_sitofp_double_const_base_2_fast(
-; CHECK-NEXT:    [[LDEXPF:%.*]] = tail call afn float @ldexpf(float 1.000000e+00, i16 [[X:%.*]])
+; CHECK-NEXT:    [[LDEXPF:%.*]] = tail call afn float @llvm.ldexp.f32.i16(float 1.000000e+00, i16 [[X:%.*]])
 ; CHECK-NEXT:    [[RES:%.*]] = fpext float [[LDEXPF]] to double
 ; CHECK-NEXT:    ret double [[RES]]
 ;
@@ -78,7 +78,7 @@ define double @pow_sitofp_double_const_base_power_of_2_fast(i16 %x) {
 define double @pow_uitofp_const_base_2_fast(i15 %x) {
 ; CHECK-LABEL: @pow_uitofp_const_base_2_fast(
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i15 [[X:%.*]] to i16
-; CHECK-NEXT:    [[LDEXPF:%.*]] = tail call afn float @ldexpf(float 1.000000e+00, i16 [[TMP1]])
+; CHECK-NEXT:    [[LDEXPF:%.*]] = tail call afn float @llvm.ldexp.f32.i16(float 1.000000e+00, i16 [[TMP1]])
 ; CHECK-NEXT:    [[RES:%.*]] = fpext float [[LDEXPF]] to double
 ; CHECK-NEXT:    ret double [[RES]]
 ;
@@ -313,7 +313,7 @@ define double @pow_uitofp_const_base_no_fast(i16 %x) {
 
 define double @pow_sitofp_const_base_2_no_fast(i16 %x) {
 ; CHECK-LABEL: @pow_sitofp_const_base_2_no_fast(
-; CHECK-NEXT:    [[LDEXPF:%.*]] = tail call float @ldexpf(float 1.000000e+00, i16 [[X:%.*]])
+; CHECK-NEXT:    [[LDEXPF:%.*]] = tail call float @llvm.ldexp.f32.i16(float 1.000000e+00, i16 [[X:%.*]])
 ; CHECK-NEXT:    [[RES:%.*]] = fpext float [[LDEXPF]] to double
 ; CHECK-NEXT:    ret double [[RES]]
 ;
@@ -412,9 +412,11 @@ define double @pow_uitofp_double_base_no_fast(double %base, i16 %x) {
   ret double %pow
 }
 
+; negative test - pow with no FMF is not the same as the loosely-specified powi
+
 define double @powf_exp_const_int_no_fast(double %base) {
 ; CHECK-LABEL: @powf_exp_const_int_no_fast(
-; CHECK-NEXT:    [[RES:%.*]] = tail call double @llvm.powi.f64.i16(double [[BASE:%.*]], i16 40)
+; CHECK-NEXT:    [[RES:%.*]] = tail call double @llvm.pow.f64(double [[BASE:%.*]], double 4.000000e+01)
 ; CHECK-NEXT:    ret double [[RES]]
 ;
   %res = tail call double @llvm.pow.f64(double %base, double 4.000000e+01)
@@ -441,9 +443,11 @@ define double @powf_exp_const_not_int_no_fast(double %base) {
   ret double %res
 }
 
+; negative test - pow with no FMF is not the same as the loosely-specified powi
+
 define double @powf_exp_const2_int_no_fast(double %base) {
 ; CHECK-LABEL: @powf_exp_const2_int_no_fast(
-; CHECK-NEXT:    [[RES:%.*]] = tail call double @llvm.powi.f64.i16(double [[BASE:%.*]], i16 -40)
+; CHECK-NEXT:    [[RES:%.*]] = tail call double @llvm.pow.f64(double [[BASE:%.*]], double -4.000000e+01)
 ; CHECK-NEXT:    ret double [[RES]]
 ;
   %res = tail call double @llvm.pow.f64(double %base, double -4.000000e+01)

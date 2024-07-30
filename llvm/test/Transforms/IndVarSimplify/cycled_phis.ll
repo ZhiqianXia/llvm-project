@@ -7,10 +7,10 @@ declare i32 @switch.cond()
 declare i32 @llvm.smax.i32(i32 %a, i32 %b)
 
 ; Unsigned comparison here is redundant and can be safely deleted.
-define i32 @trivial.case(i32* %len.ptr) {
+define i32 @trivial.case(ptr %len.ptr) {
 ; CHECK-LABEL: @trivial.case(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[LEN_PTR:%.*]], align 4, !range [[RNG0:![0-9]+]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, ptr [[LEN_PTR:%.*]], align 4, !range [[RNG0:![0-9]+]]
 ; CHECK-NEXT:    br label [[PREHEADER:%.*]]
 ; CHECK:       preheader:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
@@ -19,7 +19,7 @@ define i32 @trivial.case(i32* %len.ptr) {
 ; CHECK-NEXT:    [[SIGNED_CMP:%.*]] = icmp ult i32 [[IV]], [[LEN]]
 ; CHECK-NEXT:    br i1 [[SIGNED_CMP]], label [[SIGNED_PASSED:%.*]], label [[FAILED_SIGNED:%.*]]
 ; CHECK:       signed.passed:
-; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAILED_SIGNED]]
+; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAILED_UNSIGNED:%.*]]
 ; CHECK:       backedge:
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = call i1 @cond()
@@ -31,11 +31,11 @@ define i32 @trivial.case(i32* %len.ptr) {
 ; CHECK-NEXT:    call void @fail(i32 2)
 ; CHECK-NEXT:    unreachable
 ; CHECK:       done:
-; CHECK-NEXT:    [[IV_LCSSA1:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
-; CHECK-NEXT:    ret i32 [[IV_LCSSA1]]
+; CHECK-NEXT:    [[IV_LCSSA2:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
+; CHECK-NEXT:    ret i32 [[IV_LCSSA2]]
 ;
 entry:
-  %len = load i32, i32* %len.ptr, !range !0
+  %len = load i32, ptr %len.ptr, !range !0
   br label %preheader
 
 preheader:
@@ -48,7 +48,7 @@ loop:
 
 signed.passed:
   %unsigned.cmp = icmp ult i32 %iv, %len
-  br i1 %unsigned.cmp, label %backedge, label %failed.signed
+  br i1 %unsigned.cmp, label %backedge, label %failed.unsigned
 
 backedge:
   %iv.next = add i32 %iv, 1
@@ -67,15 +67,80 @@ done:
   ret i32 %iv
 }
 
+; TODO: The 2nd check can be made invariant.
+; slt and ult checks are equivalent. When IV is negative, slt check will pass and ult will
+; fail. Because IV is incrementing, this will fail on 1st iteration or never.
+define i32 @unknown.start(i32 %start, ptr %len.ptr) {
+; CHECK-LABEL: @unknown.start(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, ptr [[LEN_PTR:%.*]], align 4, !range [[RNG0]]
+; CHECK-NEXT:    br label [[PREHEADER:%.*]]
+; CHECK:       preheader:
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[START:%.*]], [[PREHEADER]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
+; CHECK-NEXT:    [[SIGNED_CMP:%.*]] = icmp slt i32 [[IV]], [[LEN]]
+; CHECK-NEXT:    br i1 [[SIGNED_CMP]], label [[SIGNED_PASSED:%.*]], label [[FAILED_SIGNED:%.*]]
+; CHECK:       signed.passed:
+; CHECK-NEXT:    [[UNSIGNED_CMP:%.*]] = icmp ult i32 [[IV]], [[LEN]]
+; CHECK-NEXT:    br i1 [[UNSIGNED_CMP]], label [[BACKEDGE]], label [[FAILED_UNSIGNED:%.*]]
+; CHECK:       backedge:
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
+; CHECK-NEXT:    [[COND:%.*]] = call i1 @cond()
+; CHECK-NEXT:    br i1 [[COND]], label [[LOOP]], label [[DONE:%.*]]
+; CHECK:       failed.signed:
+; CHECK-NEXT:    call void @fail(i32 1)
+; CHECK-NEXT:    unreachable
+; CHECK:       failed.unsigned:
+; CHECK-NEXT:    call void @fail(i32 2)
+; CHECK-NEXT:    unreachable
+; CHECK:       done:
+; CHECK-NEXT:    [[IV_LCSSA2:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
+; CHECK-NEXT:    ret i32 [[IV_LCSSA2]]
+;
+entry:
+  %len = load i32, ptr %len.ptr, !range !0
+  br label %preheader
+
+preheader:
+  br label %loop
+
+loop:
+  %iv = phi i32 [%start, %preheader], [%iv.next, %backedge]
+  %signed.cmp = icmp slt i32 %iv, %len
+  br i1 %signed.cmp, label %signed.passed, label %failed.signed
+
+signed.passed:
+  %unsigned.cmp = icmp ult i32 %iv, %len
+  br i1 %unsigned.cmp, label %backedge, label %failed.unsigned
+
+backedge:
+  %iv.next = add i32 %iv, 1
+  %cond = call i1 @cond()
+  br i1 %cond, label %loop, label %done
+
+failed.signed:
+  call void @fail(i32 1)
+  unreachable
+
+failed.unsigned:
+  call void @fail(i32 2)
+  unreachable
+
+done:
+  ret i32 %iv
+}
+
+
 ; TODO: We should be able to prove that:
 ; - %sibling.iv.next is non-negative;
 ; - therefore, %iv is non-negative;
 ; - therefore, unsigned check can be removed.
-define i32 @start.from.sibling.iv(i32* %len.ptr, i32* %sibling.len.ptr) {
+define i32 @start.from.sibling.iv(ptr %len.ptr, ptr %sibling.len.ptr) {
 ; CHECK-LABEL: @start.from.sibling.iv(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[LEN_PTR:%.*]], align 4, !range [[RNG0]]
-; CHECK-NEXT:    [[SIBLING_LEN:%.*]] = load i32, i32* [[SIBLING_LEN_PTR:%.*]], align 4, !range [[RNG0]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, ptr [[LEN_PTR:%.*]], align 4, !range [[RNG0]]
+; CHECK-NEXT:    [[SIBLING_LEN:%.*]] = load i32, ptr [[SIBLING_LEN_PTR:%.*]], align 4, !range [[RNG0]]
 ; CHECK-NEXT:    br label [[SIBLING_LOOP:%.*]]
 ; CHECK:       sibling.loop:
 ; CHECK-NEXT:    [[SIBLING_IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[SIBLING_IV_NEXT:%.*]], [[SIBLING_BACKEDGE:%.*]] ]
@@ -94,9 +159,9 @@ define i32 @start.from.sibling.iv(i32* %len.ptr, i32* %sibling.len.ptr) {
 ; CHECK-NEXT:    br i1 [[SIGNED_CMP]], label [[SIGNED_PASSED:%.*]], label [[FAILED_SIGNED:%.*]]
 ; CHECK:       signed.passed:
 ; CHECK-NEXT:    [[UNSIGNED_CMP:%.*]] = icmp ult i32 [[IV]], [[LEN]]
-; CHECK-NEXT:    br i1 [[UNSIGNED_CMP]], label [[BACKEDGE]], label [[FAILED_SIGNED]]
+; CHECK-NEXT:    br i1 [[UNSIGNED_CMP]], label [[BACKEDGE]], label [[FAILED_UNSIGNED:%.*]]
 ; CHECK:       backedge:
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[COND]], label [[LOOP]], label [[DONE:%.*]]
 ; CHECK:       failed.signed:
@@ -109,12 +174,12 @@ define i32 @start.from.sibling.iv(i32* %len.ptr, i32* %sibling.len.ptr) {
 ; CHECK-NEXT:    call void @fail(i32 3)
 ; CHECK-NEXT:    unreachable
 ; CHECK:       done:
-; CHECK-NEXT:    [[IV_LCSSA1:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
-; CHECK-NEXT:    ret i32 [[IV_LCSSA1]]
+; CHECK-NEXT:    [[IV_LCSSA2:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
+; CHECK-NEXT:    ret i32 [[IV_LCSSA2]]
 ;
 entry:
-  %len = load i32, i32* %len.ptr, !range !0
-  %sibling.len = load i32, i32* %sibling.len.ptr, !range !0
+  %len = load i32, ptr %len.ptr, !range !0
+  %sibling.len = load i32, ptr %sibling.len.ptr, !range !0
   br label %sibling.loop
 
 sibling.loop:
@@ -137,7 +202,7 @@ loop:
 
 signed.passed:
   %unsigned.cmp = icmp ult i32 %iv, %len
-  br i1 %unsigned.cmp, label %backedge, label %failed.signed
+  br i1 %unsigned.cmp, label %backedge, label %failed.unsigned
 
 backedge:
   %iv.next = add i32 %iv, 1
@@ -161,11 +226,11 @@ done:
 }
 
 ; Same as above, but the sibling loop is now wide. We can eliminate the unsigned comparison here.
-define i32 @start.from.sibling.iv.wide(i32* %len.ptr, i32* %sibling.len.ptr) {
+define i32 @start.from.sibling.iv.wide(ptr %len.ptr, ptr %sibling.len.ptr) {
 ; CHECK-LABEL: @start.from.sibling.iv.wide(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[LEN_PTR:%.*]], align 4, !range [[RNG0]]
-; CHECK-NEXT:    [[SIBLING_LEN:%.*]] = load i32, i32* [[SIBLING_LEN_PTR:%.*]], align 4, !range [[RNG0]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, ptr [[LEN_PTR:%.*]], align 4, !range [[RNG0]]
+; CHECK-NEXT:    [[SIBLING_LEN:%.*]] = load i32, ptr [[SIBLING_LEN_PTR:%.*]], align 4, !range [[RNG0]]
 ; CHECK-NEXT:    [[SIBLING_LEN_WIDE:%.*]] = zext i32 [[SIBLING_LEN]] to i64
 ; CHECK-NEXT:    br label [[SIBLING_LOOP:%.*]]
 ; CHECK:       sibling.loop:
@@ -185,9 +250,9 @@ define i32 @start.from.sibling.iv.wide(i32* %len.ptr, i32* %sibling.len.ptr) {
 ; CHECK-NEXT:    [[SIGNED_CMP:%.*]] = icmp ult i32 [[IV]], [[LEN]]
 ; CHECK-NEXT:    br i1 [[SIGNED_CMP]], label [[SIGNED_PASSED:%.*]], label [[FAILED_SIGNED:%.*]]
 ; CHECK:       signed.passed:
-; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAILED_SIGNED]]
+; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAILED_UNSIGNED:%.*]]
 ; CHECK:       backedge:
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[COND]], label [[LOOP]], label [[DONE:%.*]]
 ; CHECK:       failed.signed:
@@ -200,12 +265,12 @@ define i32 @start.from.sibling.iv.wide(i32* %len.ptr, i32* %sibling.len.ptr) {
 ; CHECK-NEXT:    call void @fail(i32 3)
 ; CHECK-NEXT:    unreachable
 ; CHECK:       done:
-; CHECK-NEXT:    [[IV_LCSSA1:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
-; CHECK-NEXT:    ret i32 [[IV_LCSSA1]]
+; CHECK-NEXT:    [[IV_LCSSA2:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
+; CHECK-NEXT:    ret i32 [[IV_LCSSA2]]
 ;
 entry:
-  %len = load i32, i32* %len.ptr, !range !0
-  %sibling.len = load i32, i32* %sibling.len.ptr, !range !0
+  %len = load i32, ptr %len.ptr, !range !0
+  %sibling.len = load i32, ptr %sibling.len.ptr, !range !0
   %sibling.len.wide = zext i32 %sibling.len to i64
   br label %sibling.loop
 
@@ -230,7 +295,7 @@ loop:
 
 signed.passed:
   %unsigned.cmp = icmp ult i32 %iv, %len
-  br i1 %unsigned.cmp, label %backedge, label %failed.signed
+  br i1 %unsigned.cmp, label %backedge, label %failed.unsigned
 
 backedge:
   %iv.next = add i32 %iv, 1
@@ -255,11 +320,13 @@ done:
 
 ; Slightly more complex version of previous one (cycled phis).
 ; TODO: remove unsigned comparison by proving non-negativity of iv.start.
-define i32 @start.from.sibling.iv.wide.cycled.phis(i32* %len.ptr, i32* %sibling.len.ptr) {
+; TODO: When we check against IV_START, for some reason we then cannot infer nuw for IV.next.
+;       It was possible while checking against IV. Missing inference logic somewhere.
+define i32 @start.from.sibling.iv.wide.cycled.phis(ptr %len.ptr, ptr %sibling.len.ptr) {
 ; CHECK-LABEL: @start.from.sibling.iv.wide.cycled.phis(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[LEN_PTR:%.*]], align 4, !range [[RNG0]]
-; CHECK-NEXT:    [[SIBLING_LEN:%.*]] = load i32, i32* [[SIBLING_LEN_PTR:%.*]], align 4, !range [[RNG0]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, ptr [[LEN_PTR:%.*]], align 4, !range [[RNG0]]
+; CHECK-NEXT:    [[SIBLING_LEN:%.*]] = load i32, ptr [[SIBLING_LEN_PTR:%.*]], align 4, !range [[RNG0]]
 ; CHECK-NEXT:    [[SIBLING_LEN_WIDE:%.*]] = zext i32 [[SIBLING_LEN]] to i64
 ; CHECK-NEXT:    br label [[SIBLING_LOOP:%.*]]
 ; CHECK:       sibling.loop:
@@ -284,15 +351,15 @@ define i32 @start.from.sibling.iv.wide.cycled.phis(i32* %len.ptr, i32* %sibling.
 ; CHECK-NEXT:    [[SIGNED_CMP:%.*]] = icmp slt i32 [[IV]], [[LEN]]
 ; CHECK-NEXT:    br i1 [[SIGNED_CMP]], label [[SIGNED_PASSED:%.*]], label [[FAILED_SIGNED:%.*]]
 ; CHECK:       signed.passed:
-; CHECK-NEXT:    [[UNSIGNED_CMP:%.*]] = icmp ult i32 [[IV]], [[LEN]]
-; CHECK-NEXT:    br i1 [[UNSIGNED_CMP]], label [[BACKEDGE]], label [[FAILED_SIGNED]]
+; CHECK-NEXT:    [[UNSIGNED_CMP:%.*]] = icmp ult i32 [[IV_START]], [[LEN]]
+; CHECK-NEXT:    br i1 [[UNSIGNED_CMP]], label [[BACKEDGE]], label [[FAILED_UNSIGNED:%.*]]
 ; CHECK:       backedge:
-; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[COND]], label [[LOOP]], label [[OUTER_LOOP_BACKEDGE]]
 ; CHECK:       outer.loop.backedge:
 ; CHECK-NEXT:    [[IV_NEXT_LCSSA]] = phi i32 [ [[IV_NEXT]], [[BACKEDGE]] ]
-; CHECK-NEXT:    [[IV_LCSSA1:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
+; CHECK-NEXT:    [[IV_LCSSA2:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
 ; CHECK-NEXT:    [[OUTER_COND:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[OUTER_COND]], label [[OUTER_LOOP]], label [[DONE:%.*]]
 ; CHECK:       failed.signed:
@@ -305,12 +372,12 @@ define i32 @start.from.sibling.iv.wide.cycled.phis(i32* %len.ptr, i32* %sibling.
 ; CHECK-NEXT:    call void @fail(i32 3)
 ; CHECK-NEXT:    unreachable
 ; CHECK:       done:
-; CHECK-NEXT:    [[IV_LCSSA1_LCSSA:%.*]] = phi i32 [ [[IV_LCSSA1]], [[OUTER_LOOP_BACKEDGE]] ]
-; CHECK-NEXT:    ret i32 [[IV_LCSSA1_LCSSA]]
+; CHECK-NEXT:    [[IV_LCSSA2_LCSSA:%.*]] = phi i32 [ [[IV_LCSSA2]], [[OUTER_LOOP_BACKEDGE]] ]
+; CHECK-NEXT:    ret i32 [[IV_LCSSA2_LCSSA]]
 ;
 entry:
-  %len = load i32, i32* %len.ptr, !range !0
-  %sibling.len = load i32, i32* %sibling.len.ptr, !range !0
+  %len = load i32, ptr %len.ptr, !range !0
+  %sibling.len = load i32, ptr %sibling.len.ptr, !range !0
   %sibling.len.wide = zext i32 %sibling.len to i64
   br label %sibling.loop
 
@@ -342,7 +409,7 @@ loop:
 
 signed.passed:
   %unsigned.cmp = icmp ult i32 %iv, %len
-  br i1 %unsigned.cmp, label %backedge, label %failed.signed
+  br i1 %unsigned.cmp, label %backedge, label %failed.unsigned
 
 backedge:
   %iv.next = add i32 %iv, 1
@@ -373,11 +440,11 @@ done:
 
 ; Even more complex version of previous one (more sophisticated cycled phis).
 ; TODO: remove unsigned comparison by proving non-negativity of iv.start.
-define i32 @start.from.sibling.iv.wide.cycled.phis.complex.phis(i32* %len.ptr, i32* %sibling.len.ptr, i32 %some.random.value) {
+define i32 @start.from.sibling.iv.wide.cycled.phis.complex.phis(ptr %len.ptr, ptr %sibling.len.ptr, i32 %some.random.value) {
 ; CHECK-LABEL: @start.from.sibling.iv.wide.cycled.phis.complex.phis(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[LEN_PTR:%.*]], align 4, !range [[RNG0]]
-; CHECK-NEXT:    [[SIBLING_LEN:%.*]] = load i32, i32* [[SIBLING_LEN_PTR:%.*]], align 4, !range [[RNG0]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, ptr [[LEN_PTR:%.*]], align 4, !range [[RNG0]]
+; CHECK-NEXT:    [[SIBLING_LEN:%.*]] = load i32, ptr [[SIBLING_LEN_PTR:%.*]], align 4, !range [[RNG0]]
 ; CHECK-NEXT:    [[SIBLING_LEN_WIDE:%.*]] = zext i32 [[SIBLING_LEN]] to i64
 ; CHECK-NEXT:    br label [[SIBLING_LOOP:%.*]]
 ; CHECK:       sibling.loop:
@@ -402,19 +469,19 @@ define i32 @start.from.sibling.iv.wide.cycled.phis.complex.phis(i32* %len.ptr, i
 ; CHECK-NEXT:    [[SIGNED_CMP:%.*]] = icmp slt i32 [[IV]], [[LEN]]
 ; CHECK-NEXT:    br i1 [[SIGNED_CMP]], label [[SIGNED_PASSED:%.*]], label [[FAILED_SIGNED:%.*]]
 ; CHECK:       signed.passed:
-; CHECK-NEXT:    [[UNSIGNED_CMP:%.*]] = icmp ult i32 [[IV]], [[LEN]]
-; CHECK-NEXT:    br i1 [[UNSIGNED_CMP]], label [[BACKEDGE]], label [[FAILED_SIGNED]]
+; CHECK-NEXT:    [[UNSIGNED_CMP:%.*]] = icmp ult i32 [[IV_START]], [[LEN]]
+; CHECK-NEXT:    br i1 [[UNSIGNED_CMP]], label [[BACKEDGE]], label [[FAILED_UNSIGNED:%.*]]
 ; CHECK:       backedge:
-; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[COND]], label [[LOOP]], label [[OUTER_LOOP_SELECTION:%.*]]
 ; CHECK:       outer.loop.selection:
 ; CHECK-NEXT:    [[IV_NEXT_LCSSA:%.*]] = phi i32 [ [[IV_NEXT]], [[BACKEDGE]] ]
-; CHECK-NEXT:    [[IV_LCSSA1:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
+; CHECK-NEXT:    [[IV_LCSSA2:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
 ; CHECK-NEXT:    [[SWITCH_COND:%.*]] = call i32 @switch.cond()
 ; CHECK-NEXT:    switch i32 [[SWITCH_COND]], label [[TAKE_SAME:%.*]] [
-; CHECK-NEXT:    i32 1, label [[TAKE_INCREMENT:%.*]]
-; CHECK-NEXT:    i32 2, label [[TAKE_SMAX:%.*]]
+; CHECK-NEXT:      i32 1, label [[TAKE_INCREMENT:%.*]]
+; CHECK-NEXT:      i32 2, label [[TAKE_SMAX:%.*]]
 ; CHECK-NEXT:    ]
 ; CHECK:       take.same:
 ; CHECK-NEXT:    br label [[OUTER_LOOP_BACKEDGE]]
@@ -437,12 +504,12 @@ define i32 @start.from.sibling.iv.wide.cycled.phis.complex.phis(i32* %len.ptr, i
 ; CHECK-NEXT:    call void @fail(i32 3)
 ; CHECK-NEXT:    unreachable
 ; CHECK:       done:
-; CHECK-NEXT:    [[IV_LCSSA1_LCSSA:%.*]] = phi i32 [ [[IV_LCSSA1]], [[OUTER_LOOP_BACKEDGE]] ]
-; CHECK-NEXT:    ret i32 [[IV_LCSSA1_LCSSA]]
+; CHECK-NEXT:    [[IV_LCSSA2_LCSSA:%.*]] = phi i32 [ [[IV_LCSSA2]], [[OUTER_LOOP_BACKEDGE]] ]
+; CHECK-NEXT:    ret i32 [[IV_LCSSA2_LCSSA]]
 ;
 entry:
-  %len = load i32, i32* %len.ptr, !range !0
-  %sibling.len = load i32, i32* %sibling.len.ptr, !range !0
+  %len = load i32, ptr %len.ptr, !range !0
+  %sibling.len = load i32, ptr %sibling.len.ptr, !range !0
   %sibling.len.wide = zext i32 %sibling.len to i64
   br label %sibling.loop
 
@@ -474,7 +541,7 @@ loop:
 
 signed.passed:
   %unsigned.cmp = icmp ult i32 %iv, %len
-  br i1 %unsigned.cmp, label %backedge, label %failed.signed
+  br i1 %unsigned.cmp, label %backedge, label %failed.unsigned
 
 backedge:
   %iv.next = add i32 %iv, 1

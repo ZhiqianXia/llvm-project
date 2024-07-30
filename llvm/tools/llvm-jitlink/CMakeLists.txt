@@ -11,17 +11,21 @@ set(LLVM_LINK_COMPONENTS
   JITLink
   MC
   Object
+  OrcDebugging
   OrcJIT
   OrcShared
   OrcTargetProcess
   RuntimeDyld
   Support
+  TargetParser
   )
 
 add_llvm_tool(llvm-jitlink
   llvm-jitlink.cpp
+  llvm-jitlink-coff.cpp
   llvm-jitlink-elf.cpp
   llvm-jitlink-macho.cpp
+  llvm-jitlink-statistics.cpp
   )
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Haiku")
@@ -29,7 +33,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Haiku")
 endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "SunOS")
-  target_link_libraries(llvm-jitlink PRIVATE socket nsl)
+  target_link_libraries(llvm-jitlink PRIVATE socket)
 endif()
 
 export_executable_symbols(llvm-jitlink)

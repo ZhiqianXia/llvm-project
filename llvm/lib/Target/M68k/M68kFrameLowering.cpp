@@ -246,9 +246,7 @@ MachineBasicBlock::iterator M68kFrameLowering::eliminateCallFramePseudoInstr(
     unsigned StackAlign = getStackAlignment();
     Amount = alignTo(Amount, StackAlign);
 
-    MachineModuleInfo &MMI = MF.getMMI();
-    const auto &Fn = MF.getFunction();
-    bool DwarfCFI = MMI.hasDebugInfo() || Fn.needsUnwindTableEntry();
+    bool DwarfCFI = MF.needsFrameMoves();
 
     // If we have any exception handlers in this function, and we adjust
     // the SP before calls, we may need to indicate this to the unwinder
@@ -452,8 +450,7 @@ void M68kFrameLowering::emitPrologueCalleeSavedFrameMoves(
     const DebugLoc &DL) const {
   MachineFunction &MF = *MBB.getParent();
   MachineFrameInfo &MFI = MF.getFrameInfo();
-  MachineModuleInfo &MMI = MF.getMMI();
-  const MCRegisterInfo *MRI = MMI.getContext().getRegisterInfo();
+  const MCRegisterInfo *MRI = MF.getContext().getRegisterInfo();
 
   // Add callee saved registers to move list.
   const auto &CSI = MFI.getCalleeSavedInfo();
@@ -478,13 +475,11 @@ void M68kFrameLowering::emitPrologue(MachineFunction &MF,
 
   MachineBasicBlock::iterator MBBI = MBB.begin();
   MachineFrameInfo &MFI = MF.getFrameInfo();
-  const auto &Fn = MF.getFunction();
-  MachineModuleInfo &MMI = MF.getMMI();
   M68kMachineFunctionInfo *MMFI = MF.getInfo<M68kMachineFunctionInfo>();
   uint64_t MaxAlign = calculateMaxStackAlign(MF); // Desired stack alignment.
   uint64_t StackSize = MFI.getStackSize(); // Number of bytes to allocate.
   bool HasFP = hasFP(MF);
-  bool NeedsDwarfCFI = MMI.hasDebugInfo() || Fn.needsUnwindTableEntry();
+  bool NeedsDwarfCFI = MF.needsFrameMoves();
   Register FramePtr = TRI->getFrameRegister(MF);
   const unsigned MachineFramePtr = FramePtr;
   unsigned BasePtr = TRI->getBaseRegister();
@@ -546,9 +541,9 @@ void M68kFrameLowering::emitPrologue(MachineFunction &MF,
     // Update the frame offset adjustment.
     MFI.setOffsetAdjustment(-NumBytes);
 
-    // Save FP into the appropriate stack slot.
-    BuildMI(MBB, MBBI, DL, TII.get(M68k::PUSH32r))
-        .addReg(MachineFramePtr, RegState::Kill)
+    BuildMI(MBB, MBBI, DL, TII.get(M68k::LINK16))
+        .addReg(M68k::WA6, RegState::Kill)
+        .addImm(-NumBytes)
         .setMIFlag(MachineInstr::FrameSetup);
 
     if (NeedsDwarfCFI) {
@@ -565,11 +560,6 @@ void M68kFrameLowering::emitPrologue(MachineFunction &MF,
                MCCFIInstruction::createOffset(nullptr, DwarfFramePtr,
                                               2 * stackGrowth));
     }
-
-    // Update FP with the new base value.
-    BuildMI(MBB, MBBI, DL, TII.get(M68k::MOV32aa), FramePtr)
-        .addReg(StackPtr)
-        .setMIFlag(MachineInstr::FrameSetup);
 
     if (NeedsDwarfCFI) {
       // Mark effective beginning of when frame pointer becomes valid.
@@ -619,7 +609,8 @@ void M68kFrameLowering::emitPrologue(MachineFunction &MF,
   NumBytes -= mergeSPUpdates(MBB, MBBI, true);
 
   // Adjust stack pointer: ESP -= numbytes.
-  emitSPUpdate(MBB, MBBI, -(int64_t)NumBytes, /*InEpilogue=*/false);
+  if (!HasFP)
+    emitSPUpdate(MBB, MBBI, -(int64_t)NumBytes, /*InEpilogue=*/false);
 
   unsigned SPOrEstablisher = StackPtr;
 
@@ -677,7 +668,7 @@ void M68kFrameLowering::emitEpilogue(MachineFunction &MF,
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   M68kMachineFunctionInfo *MMFI = MF.getInfo<M68kMachineFunctionInfo>();
   MachineBasicBlock::iterator MBBI = MBB.getFirstTerminator();
-  Optional<unsigned> RetOpcode;
+  std::optional<unsigned> RetOpcode;
   if (MBBI != MBB.end())
     RetOpcode = MBBI->getOpcode();
   DebugLoc DL;
@@ -702,9 +693,6 @@ void M68kFrameLowering::emitEpilogue(MachineFunction &MF,
     if (TRI->hasStackRealignment(MF))
       NumBytes = alignTo(FrameSize, MaxAlign);
 
-    // Pop FP.
-    BuildMI(MBB, MBBI, DL, TII.get(M68k::POP32r), MachineFramePtr)
-        .setMIFlag(MachineInstr::FrameDestroy);
   } else {
     NumBytes = StackSize - CSSize;
   }
@@ -749,10 +737,15 @@ void M68kFrameLowering::emitEpilogue(MachineFunction &MF,
           LEAAmount);
       --MBBI;
     } else {
-      unsigned Opc = (M68k::MOV32rr);
-      BuildMI(MBB, MBBI, DL, TII.get(Opc), StackPtr).addReg(FramePtr);
+      BuildMI(MBB, MBBI, DL, TII.get(M68k::UNLK))
+          .addReg(MachineFramePtr, RegState::Kill)
+          .setMIFlag(MachineInstr::FrameDestroy);
       --MBBI;
     }
+  } else if (hasFP(MF)) {
+    BuildMI(MBB, MBBI, DL, TII.get(M68k::UNLK))
+        .addReg(MachineFramePtr, RegState::Kill)
+        .setMIFlag(MachineInstr::FrameDestroy);
   } else if (NumBytes) {
     // Adjust stack pointer back: SP += numbytes.
     emitSPUpdate(MBB, MBBI, NumBytes, /*InEpilogue=*/true);

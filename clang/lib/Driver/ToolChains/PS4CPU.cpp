@@ -8,6 +8,7 @@
 
 #include "PS4CPU.h"
 #include "CommonArgs.h"
+#include "clang/Config/config.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/DriverDiagnostic.h"
@@ -117,11 +118,11 @@ void toolchains::PS5CPU::addSanitizerArgs(const ArgList &Args,
     CmdArgs.push_back(arg("SceThreadSanitizer_nosubmission_stub_weak"));
 }
 
-void tools::PScpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
-                                        const InputInfo &Output,
-                                        const InputInfoList &Inputs,
-                                        const ArgList &Args,
-                                        const char *LinkingOutput) const {
+void tools::PS4cpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
+                                         const InputInfo &Output,
+                                         const InputInfoList &Inputs,
+                                         const ArgList &Args,
+                                         const char *LinkingOutput) const {
   auto &TC = static_cast<const toolchains::PS4PS5Base &>(getToolChain());
   const Driver &D = TC.getDriver();
   ArgStringList CmdArgs;
@@ -145,22 +146,44 @@ void tools::PScpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.hasArg(options::OPT_shared))
     CmdArgs.push_back("--shared");
 
+  assert((Output.isFilename() || Output.isNothing()) && "Invalid output.");
   if (Output.isFilename()) {
     CmdArgs.push_back("-o");
     CmdArgs.push_back(Output.getFilename());
-  } else {
-    assert(Output.isNothing() && "Invalid output.");
   }
+
+  const bool UseJMC =
+      Args.hasFlag(options::OPT_fjmc, options::OPT_fno_jmc, false);
+
+  const char *LTOArgs = "";
+  auto AddLTOFlag = [&](Twine Flag) {
+    LTOArgs = Args.MakeArgString(Twine(LTOArgs) + " " + Flag);
+  };
+
+  // If the linker sees bitcode objects it will perform LTO. We can't tell
+  // whether or not that will be the case at this point. So, unconditionally
+  // pass LTO options to ensure proper codegen, metadata production, etc if
+  // LTO indeed occurs.
+  if (Args.hasFlag(options::OPT_funified_lto, options::OPT_fno_unified_lto,
+                   true))
+    CmdArgs.push_back(D.getLTOMode() == LTOK_Thin ? "--lto=thin"
+                                                  : "--lto=full");
+  if (UseJMC)
+    AddLTOFlag("-enable-jmc-instrument");
+
+  if (Arg *A = Args.getLastArg(options::OPT_fcrash_diagnostics_dir))
+    AddLTOFlag(Twine("-crash-diagnostics-dir=") + A->getValue());
+
+  if (StringRef Threads = getLTOParallelism(Args, D); !Threads.empty())
+    AddLTOFlag(Twine("-threads=") + Threads);
+
+  CmdArgs.push_back(Args.MakeArgString(Twine("-lto-debug-options=") + LTOArgs));
 
   if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs))
     TC.addSanitizerArgs(Args, CmdArgs, "-l", "");
 
-  Args.AddAllArgs(CmdArgs, options::OPT_L);
-  Args.AddAllArgs(CmdArgs, options::OPT_T_Group);
-  Args.AddAllArgs(CmdArgs, options::OPT_e);
-  Args.AddAllArgs(CmdArgs, options::OPT_s);
-  Args.AddAllArgs(CmdArgs, options::OPT_t);
-  Args.AddAllArgs(CmdArgs, options::OPT_r);
+  Args.addAllArgs(CmdArgs, {options::OPT_L, options::OPT_T_Group,
+                            options::OPT_s, options::OPT_t});
 
   if (Args.hasArg(options::OPT_Z_Xlinker__no_demangle))
     CmdArgs.push_back("--no-demangle");
@@ -169,6 +192,109 @@ void tools::PScpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   if (Args.hasArg(options::OPT_pthread)) {
     CmdArgs.push_back("-lpthread");
+  }
+
+  if (UseJMC) {
+    CmdArgs.push_back("--whole-archive");
+    CmdArgs.push_back("-lSceDbgJmc");
+    CmdArgs.push_back("--no-whole-archive");
+  }
+
+  if (Args.hasArg(options::OPT_fuse_ld_EQ)) {
+    D.Diag(diag::err_drv_unsupported_opt_for_target)
+        << "-fuse-ld" << TC.getTriple().str();
+  }
+
+  std::string LdName = TC.qualifyPSCmdName(TC.getLinkerBaseName());
+  const char *Exec = Args.MakeArgString(TC.GetProgramPath(LdName.c_str()));
+
+  C.addCommand(std::make_unique<Command>(JA, *this,
+                                         ResponseFileSupport::AtFileUTF8(),
+                                         Exec, CmdArgs, Inputs, Output));
+}
+
+void tools::PS5cpu::Linker::ConstructJob(Compilation &C, const JobAction &JA,
+                                         const InputInfo &Output,
+                                         const InputInfoList &Inputs,
+                                         const ArgList &Args,
+                                         const char *LinkingOutput) const {
+  auto &TC = static_cast<const toolchains::PS4PS5Base &>(getToolChain());
+  const Driver &D = TC.getDriver();
+  ArgStringList CmdArgs;
+
+  // Silence warning for "clang -g foo.o -o foo"
+  Args.ClaimAllArgs(options::OPT_g_Group);
+  // and "clang -emit-llvm foo.o -o foo"
+  Args.ClaimAllArgs(options::OPT_emit_llvm);
+  // and for "clang -w foo.o -o foo". Other warning options are already
+  // handled somewhere else.
+  Args.ClaimAllArgs(options::OPT_w);
+
+  if (!D.SysRoot.empty())
+    CmdArgs.push_back(Args.MakeArgString("--sysroot=" + D.SysRoot));
+
+  if (Args.hasArg(options::OPT_pie))
+    CmdArgs.push_back("-pie");
+
+  if (Args.hasArg(options::OPT_rdynamic))
+    CmdArgs.push_back("-export-dynamic");
+  if (Args.hasArg(options::OPT_shared))
+    CmdArgs.push_back("--shared");
+
+  assert((Output.isFilename() || Output.isNothing()) && "Invalid output.");
+  if (Output.isFilename()) {
+    CmdArgs.push_back("-o");
+    CmdArgs.push_back(Output.getFilename());
+  }
+
+  const bool UseJMC =
+      Args.hasFlag(options::OPT_fjmc, options::OPT_fno_jmc, false);
+
+  auto AddLTOFlag = [&](Twine Flag) {
+    CmdArgs.push_back(Args.MakeArgString(Twine("-plugin-opt=") + Flag));
+  };
+
+  // If the linker sees bitcode objects it will perform LTO. We can't tell
+  // whether or not that will be the case at this point. So, unconditionally
+  // pass LTO options to ensure proper codegen, metadata production, etc if
+  // LTO indeed occurs.
+  if (Args.hasFlag(options::OPT_funified_lto, options::OPT_fno_unified_lto,
+                   true))
+    CmdArgs.push_back(D.getLTOMode() == LTOK_Thin ? "--lto=thin"
+                                                  : "--lto=full");
+
+  if (UseJMC)
+    AddLTOFlag("-enable-jmc-instrument");
+
+  if (Args.hasFlag(options::OPT_fstack_size_section,
+                   options::OPT_fno_stack_size_section, false))
+    AddLTOFlag("-stack-size-section");
+
+  if (Arg *A = Args.getLastArg(options::OPT_fcrash_diagnostics_dir))
+    AddLTOFlag(Twine("-crash-diagnostics-dir=") + A->getValue());
+
+  if (StringRef Jobs = getLTOParallelism(Args, D); !Jobs.empty())
+    AddLTOFlag(Twine("jobs=") + Jobs);
+
+  if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs))
+    TC.addSanitizerArgs(Args, CmdArgs, "-l", "");
+
+  Args.addAllArgs(CmdArgs, {options::OPT_L, options::OPT_T_Group,
+                            options::OPT_s, options::OPT_t});
+
+  if (Args.hasArg(options::OPT_Z_Xlinker__no_demangle))
+    CmdArgs.push_back("--no-demangle");
+
+  AddLinkerInputs(TC, Inputs, Args, CmdArgs, JA);
+
+  if (Args.hasArg(options::OPT_pthread)) {
+    CmdArgs.push_back("-lpthread");
+  }
+
+  if (UseJMC) {
+    CmdArgs.push_back("--whole-archive");
+    CmdArgs.push_back("-lSceJmc_nosubmission");
+    CmdArgs.push_back("--no-whole-archive");
   }
 
   if (Args.hasArg(options::OPT_fuse_ld_EQ)) {
@@ -192,33 +318,25 @@ toolchains::PS4PS5Base::PS4PS5Base(const Driver &D, const llvm::Triple &Triple,
     D.Diag(clang::diag::err_drv_unsupported_opt_for_target)
         << "-static" << Platform;
 
-  // Determine where to find the PS4/PS5 libraries. We use the EnvVar
-  // if it exists; otherwise use the driver's installation path, which
-  // should be <SDK_DIR>/host_tools/bin.
-
-  SmallString<512> SDKDir;
-  if (const char *EnvValue = getenv(EnvVar)) {
-    if (!llvm::sys::fs::exists(EnvValue))
-      D.Diag(clang::diag::warn_drv_ps_sdk_dir) << EnvVar << EnvValue;
-    SDKDir = EnvValue;
+  // Determine where to find the PS4/PS5 libraries.
+  // If -isysroot was passed, use that as the SDK base path.
+  // If not, we use the EnvVar if it exists; otherwise use the driver's
+  // installation path, which should be <SDK_DIR>/host_tools/bin.
+  SmallString<80> Whence;
+  if (const Arg *A = Args.getLastArg(options::OPT_isysroot)) {
+    SDKRootDir = A->getValue();
+    if (!llvm::sys::fs::exists(SDKRootDir))
+      D.Diag(clang::diag::warn_missing_sysroot) << SDKRootDir;
+    Whence = A->getSpelling();
+  } else if (const char *EnvValue = getenv(EnvVar)) {
+    SDKRootDir = EnvValue;
+    Whence = { "environment variable '", EnvVar, "'" };
   } else {
-    SDKDir = D.Dir;
-    llvm::sys::path::append(SDKDir, "/../../");
+    SDKRootDir = D.Dir + "/../../";
+    Whence = "compiler's location";
   }
 
-  // By default, the driver won't report a warning if it can't find the
-  // SDK include or lib directories. This behavior could be changed if
-  // -Weverything or -Winvalid-or-nonexistent-directory options are passed.
-  // If -isysroot was passed, use that as the SDK base path.
-  std::string PrefixDir;
-  if (const Arg *A = Args.getLastArg(options::OPT_isysroot)) {
-    PrefixDir = A->getValue();
-    if (!llvm::sys::fs::exists(PrefixDir))
-      D.Diag(clang::diag::warn_missing_sysroot) << PrefixDir;
-  } else
-    PrefixDir = std::string(SDKDir.str());
-
-  SmallString<512> SDKIncludeDir(PrefixDir);
+  SmallString<512> SDKIncludeDir(SDKRootDir);
   llvm::sys::path::append(SDKIncludeDir, "target/include");
   if (!Args.hasArg(options::OPT_nostdinc) &&
       !Args.hasArg(options::OPT_nostdlibinc) &&
@@ -226,10 +344,10 @@ toolchains::PS4PS5Base::PS4PS5Base(const Driver &D, const llvm::Triple &Triple,
       !Args.hasArg(options::OPT__sysroot_EQ) &&
       !llvm::sys::fs::exists(SDKIncludeDir)) {
     D.Diag(clang::diag::warn_drv_unable_to_find_directory_expected)
-        << Twine(Platform, " system headers").str() << SDKIncludeDir;
+        << Twine(Platform, " system headers").str() << SDKIncludeDir << Whence;
   }
 
-  SmallString<512> SDKLibDir(SDKDir);
+  SmallString<512> SDKLibDir(SDKRootDir);
   llvm::sys::path::append(SDKLibDir, "target/lib");
   if (!Args.hasArg(options::OPT_nostdlib) &&
       !Args.hasArg(options::OPT_nodefaultlibs) &&
@@ -238,14 +356,41 @@ toolchains::PS4PS5Base::PS4PS5Base(const Driver &D, const llvm::Triple &Triple,
       !Args.hasArg(options::OPT_emit_ast) &&
       !llvm::sys::fs::exists(SDKLibDir)) {
     D.Diag(clang::diag::warn_drv_unable_to_find_directory_expected)
-        << Twine(Platform, " system libraries").str() << SDKLibDir;
+        << Twine(Platform, " system libraries").str() << SDKLibDir << Whence;
     return;
   }
-  getFilePaths().push_back(std::string(SDKLibDir.str()));
+  getFilePaths().push_back(std::string(SDKLibDir));
+}
+
+void toolchains::PS4PS5Base::AddClangSystemIncludeArgs(
+    const ArgList &DriverArgs,
+    ArgStringList &CC1Args) const {
+  const Driver &D = getDriver();
+
+  if (DriverArgs.hasArg(options::OPT_nostdinc))
+    return;
+
+  if (!DriverArgs.hasArg(options::OPT_nobuiltininc)) {
+    SmallString<128> Dir(D.ResourceDir);
+    llvm::sys::path::append(Dir, "include");
+    addSystemInclude(DriverArgs, CC1Args, Dir.str());
+  }
+
+  if (DriverArgs.hasArg(options::OPT_nostdlibinc))
+    return;
+
+  addExternCSystemInclude(DriverArgs, CC1Args,
+                          SDKRootDir + "/target/include");
+  addExternCSystemInclude(DriverArgs, CC1Args,
+                          SDKRootDir + "/target/include_common");
 }
 
 Tool *toolchains::PS4CPU::buildAssembler() const {
   return new tools::PScpu::Assembler(*this);
+}
+
+Tool *toolchains::PS4CPU::buildLinker() const {
+  return new tools::PS4cpu::Linker(*this);
 }
 
 Tool *toolchains::PS5CPU::buildAssembler() const {
@@ -254,8 +399,8 @@ Tool *toolchains::PS5CPU::buildAssembler() const {
   return nullptr;
 }
 
-Tool *toolchains::PS4PS5Base::buildLinker() const {
-  return new tools::PScpu::Linker(*this);
+Tool *toolchains::PS5CPU::buildLinker() const {
+  return new tools::PS5cpu::Linker(*this);
 }
 
 SanitizerMask toolchains::PS4PS5Base::getSupportedSanitizers() const {
@@ -285,6 +430,18 @@ void toolchains::PS4PS5Base::addClangTargetOptions(
 
   CC1Args.push_back("-fno-use-init-array");
 
+  // Default to `hidden` visibility for PS5.
+  if (getTriple().isPS5() &&
+      !DriverArgs.hasArg(options::OPT_fvisibility_EQ,
+                         options::OPT_fvisibility_ms_compat))
+    CC1Args.push_back("-fvisibility=hidden");
+
+  // Default to -fvisibility-global-new-delete=source for PS5.
+  if (getTriple().isPS5() &&
+      !DriverArgs.hasArg(options::OPT_fvisibility_global_new_delete_EQ,
+                         options::OPT_fvisibility_global_new_delete_hidden))
+    CC1Args.push_back("-fvisibility-global-new-delete=source");
+
   const Arg *A =
       DriverArgs.getLastArg(options::OPT_fvisibility_from_dllstorageclass,
                             options::OPT_fno_visibility_from_dllstorageclass);
@@ -297,11 +454,15 @@ void toolchains::PS4PS5Base::addClangTargetOptions(
     else
       CC1Args.push_back("-fvisibility-dllexport=protected");
 
+    // For PS4 we override the visibilty of globals definitions without
+    // dllimport or  dllexport annotations.
     if (DriverArgs.hasArg(options::OPT_fvisibility_nodllstorageclass_EQ))
       DriverArgs.AddLastArg(CC1Args,
                             options::OPT_fvisibility_nodllstorageclass_EQ);
-    else
+    else if (getTriple().isPS4())
       CC1Args.push_back("-fvisibility-nodllstorageclass=hidden");
+    else
+      CC1Args.push_back("-fvisibility-nodllstorageclass=keep");
 
     if (DriverArgs.hasArg(options::OPT_fvisibility_externs_dllimport_EQ))
       DriverArgs.AddLastArg(CC1Args,
@@ -309,12 +470,16 @@ void toolchains::PS4PS5Base::addClangTargetOptions(
     else
       CC1Args.push_back("-fvisibility-externs-dllimport=default");
 
+    // For PS4 we override the visibilty of external globals without
+    // dllimport or  dllexport annotations.
     if (DriverArgs.hasArg(
             options::OPT_fvisibility_externs_nodllstorageclass_EQ))
       DriverArgs.AddLastArg(
           CC1Args, options::OPT_fvisibility_externs_nodllstorageclass_EQ);
-    else
+    else if (getTriple().isPS4())
       CC1Args.push_back("-fvisibility-externs-nodllstorageclass=default");
+    else
+      CC1Args.push_back("-fvisibility-externs-nodllstorageclass=keep");
   }
 }
 

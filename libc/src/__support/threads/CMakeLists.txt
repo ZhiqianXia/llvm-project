@@ -4,6 +4,21 @@ add_header_library(
     mutex_common.h
 )
 
+add_header_library(
+  sleep
+  HDRS
+    sleep.h
+)
+
+add_header_library(
+  spin_lock
+  HDRS
+    spin_lock.h
+  DEPENDS
+    .sleep
+    libc.src.__support.CPP.atomic
+)
+
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${LIBC_TARGET_OS})
   add_subdirectory(${LIBC_TARGET_OS})
 endif()
@@ -16,6 +31,17 @@ if(TARGET libc.src.__support.threads.${LIBC_TARGET_OS}.mutex)
     DEPENDS
       .${LIBC_TARGET_OS}.mutex
   )
+
+  add_object_library(
+    fork_callbacks
+    SRCS
+      fork_callbacks.cpp
+    HDRS
+      fork_callbacks.h
+    DEPENDS
+      .mutex
+      libc.src.__support.CPP.mutex
+  )
 endif()
 
 add_header_library(
@@ -25,6 +51,9 @@ add_header_library(
   DEPENDS
     libc.src.__support.common
     libc.src.__support.CPP.atomic
+    libc.src.__support.CPP.optional
+    libc.src.__support.CPP.string_view
+    libc.src.__support.CPP.stringstream
 )
 
 if(TARGET libc.src.__support.threads.${LIBC_TARGET_OS}.thread)
@@ -33,6 +62,30 @@ if(TARGET libc.src.__support.threads.${LIBC_TARGET_OS}.thread)
     SRCS
       thread.cpp
     DEPENDS
+      .mutex
       .${LIBC_TARGET_OS}.thread
+      libc.src.__support.common
+      libc.src.__support.fixedvector
+      libc.src.__support.CPP.array
+      libc.src.__support.CPP.mutex
+      libc.src.__support.CPP.optional
+  )
+endif()
+
+if(TARGET libc.src.__support.threads.${LIBC_TARGET_OS}.callonce)
+  add_object_library(
+    callonce
+    ALIAS
+    DEPENDS
+      .${LIBC_TARGET_OS}.callonce
+  )
+endif()
+
+if(TARGET libc.src.__support.threads.${LIBC_TARGET_OS}.CndVar)
+  add_object_library(
+    CndVar
+    ALIAS
+    DEPENDS
+    .${LIBC_TARGET_OS}.CndVar
   )
 endif()

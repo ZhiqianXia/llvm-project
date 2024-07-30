@@ -11,7 +11,7 @@
 #include "lldb/Core/AddressRange.h"
 #include "lldb/Core/Module.h"
 #include "lldb/Core/Value.h"
-#include "lldb/Expression/DWARFExpression.h"
+#include "lldb/Expression/DWARFExpressionList.h"
 #include "lldb/Symbol/ArmUnwindInfo.h"
 #include "lldb/Symbol/CallFrameInfo.h"
 #include "lldb/Symbol/DWARFCallFrameInfo.h"
@@ -37,6 +37,8 @@
 #include "lldb/Utility/RegisterValue.h"
 #include "lldb/Utility/VASPrintf.h"
 #include "lldb/lldb-private.h"
+
+#include <cassert>
 #include <memory>
 
 using namespace lldb;
@@ -135,9 +137,8 @@ void RegisterContextUnwind::InitializeZerothFrame() {
   // (which would be a no-op in frame 0 where we get it from the register set,
   // but still a good idea to make the call here for other ABIs that may
   // exist.)
-  ABI *abi = process->GetABI().get();
-  if (abi)
-    current_pc = abi->FixCodeAddress(current_pc);
+  if (ABISP abi_sp = process->GetABI())
+    current_pc = abi_sp->FixCodeAddress(current_pc);
 
   UnwindPlanSP lang_runtime_plan_sp = LanguageRuntime::GetRuntimeUnwindPlan(
       m_thread, this, m_behaves_like_zeroth_frame);
@@ -289,6 +290,13 @@ void RegisterContextUnwind::InitializeZerothFrame() {
   } else
     ReadFrameAddress(row_register_kind, active_row->GetAFAValue(), m_afa);
 
+  if (m_cfa == LLDB_INVALID_ADDRESS && m_afa == LLDB_INVALID_ADDRESS) {
+    UnwindLogMsg(
+        "could not read CFA or AFA values for first frame, not valid.");
+    m_frame_type = eNotAValidFrame;
+    return;
+  }
+
   UnwindLogMsg("initialized frame current pc is 0x%" PRIx64 " cfa is 0x%" PRIx64
                " afa is 0x%" PRIx64 " using %s UnwindPlan",
                (uint64_t)m_current_pc.GetLoadAddress(exe_ctx.GetTargetPtr()),
@@ -346,17 +354,23 @@ void RegisterContextUnwind::InitializeNonZerothFrame() {
 
   // Let ABIs fixup code addresses to make sure they are valid. In ARM ABIs
   // this will strip bit zero in case we read a PC from memory or from the LR.
-  ABI *abi = process->GetABI().get();
-  if (abi)
-    pc = abi->FixCodeAddress(pc);
+  ABISP abi_sp = process->GetABI();
+  if (abi_sp)
+    pc = abi_sp->FixCodeAddress(pc);
 
   if (log) {
     UnwindLogMsg("pc = 0x%" PRIx64, pc);
     addr_t reg_val;
-    if (ReadGPRValue(eRegisterKindGeneric, LLDB_REGNUM_GENERIC_FP, reg_val))
+    if (ReadGPRValue(eRegisterKindGeneric, LLDB_REGNUM_GENERIC_FP, reg_val)) {
+      if (abi_sp)
+        reg_val = abi_sp->FixDataAddress(reg_val);
       UnwindLogMsg("fp = 0x%" PRIx64, reg_val);
-    if (ReadGPRValue(eRegisterKindGeneric, LLDB_REGNUM_GENERIC_SP, reg_val))
+    }
+    if (ReadGPRValue(eRegisterKindGeneric, LLDB_REGNUM_GENERIC_SP, reg_val)) {
+      if (abi_sp)
+        reg_val = abi_sp->FixDataAddress(reg_val);
       UnwindLogMsg("sp = 0x%" PRIx64, reg_val);
+    }
   }
 
   // A pc of 0x0 means it's the end of the stack crawl unless we're above a trap
@@ -381,7 +395,7 @@ void RegisterContextUnwind::InitializeNonZerothFrame() {
   // symbol/function information - just stick in some reasonable defaults and
   // hope we can unwind past this frame.  If we're above a trap handler,
   // we may be at a bogus address because we jumped through a bogus function
-  // pointer and trapped, so don't force the arch default unwind plan in that 
+  // pointer and trapped, so don't force the arch default unwind plan in that
   // case.
   ModuleSP pc_module_sp(m_current_pc.GetModule());
   if ((!m_current_pc.IsValid() || !pc_module_sp) &&
@@ -415,11 +429,11 @@ void RegisterContextUnwind::InitializeNonZerothFrame() {
       }
     }
 
-    if (abi) {
+    if (abi_sp) {
       m_fast_unwind_plan_sp.reset();
       m_full_unwind_plan_sp =
           std::make_shared<UnwindPlan>(lldb::eRegisterKindGeneric);
-      abi->CreateDefaultUnwindPlan(*m_full_unwind_plan_sp);
+      abi_sp->CreateDefaultUnwindPlan(*m_full_unwind_plan_sp);
       if (m_frame_type != eSkipFrame) // don't override eSkipFrame
       {
         m_frame_type = eNormalFrame;
@@ -698,7 +712,7 @@ bool RegisterContextUnwind::CheckIfLoopingStack() {
   // frames with the same
   // CFA (in theory we
   // can have arbitrary number of frames with the same CFA, but more then 2 is
-  // very very unlikely)
+  // very unlikely)
 
   RegisterContextUnwind::SharedPtr next_frame = GetNextFrame();
   if (next_frame) {
@@ -1286,7 +1300,7 @@ RegisterContextUnwind::SavedLocationForRegister(
     // arch default unwind plan is used as the Fast Unwind Plan, we
     // need to recognize this & switch over to the Full Unwind Plan
     // to see what unwind rule that (more knoweldgeable, probably)
-    // UnwindPlan has.  If the full UnwindPlan says the register 
+    // UnwindPlan has.  If the full UnwindPlan says the register
     // location is Undefined, then it really is.
     if (active_row->GetRegisterInfo(regnum.GetAsKind(unwindplan_registerkind),
                                     unwindplan_regloc) &&
@@ -1335,13 +1349,13 @@ RegisterContextUnwind::SavedLocationForRegister(
           m_full_unwind_plan_sp->GetReturnAddressRegister() !=
               LLDB_INVALID_REGNUM) {
         // If this is a trap handler frame, we should have access to
-        // the complete register context when the interrupt/async 
+        // the complete register context when the interrupt/async
         // signal was received, we should fetch the actual saved $pc
         // value instead of the Return Address register.
         // If $pc is not available, fall back to the RA reg.
         UnwindPlan::Row::RegisterLocation scratch;
         if (m_frame_type == eTrapHandlerFrame &&
-            active_row->GetRegisterInfo 
+            active_row->GetRegisterInfo
               (pc_regnum.GetAsKind (unwindplan_registerkind), scratch)) {
           UnwindLogMsg("Providing pc register instead of rewriting to "
                        "RA reg because this is a trap handler and there is "
@@ -1387,7 +1401,7 @@ RegisterContextUnwind::SavedLocationForRegister(
       // it's still live in the actual register. Handle this specially.
 
       if (!have_unwindplan_regloc && return_address_reg.IsValid() &&
-          IsFrameZero()) {
+          BehavesLikeZerothFrame()) {
         if (return_address_reg.GetAsKind(eRegisterKindLLDB) !=
             LLDB_INVALID_REGNUM) {
           lldb_private::UnwindLLDB::RegisterLocation new_regloc;
@@ -1525,7 +1539,7 @@ RegisterContextUnwind::SavedLocationForRegister(
 
   // unwindplan_regloc has valid contents about where to retrieve the register
   if (unwindplan_regloc.IsUnspecified()) {
-    lldb_private::UnwindLLDB::RegisterLocation new_regloc;
+    lldb_private::UnwindLLDB::RegisterLocation new_regloc = {};
     new_regloc.type = UnwindLLDB::RegisterLocation::eRegisterNotSaved;
     m_registers[regnum.GetAsKind(eRegisterKindLLDB)] = new_regloc;
     UnwindLogMsg("save location for %s (%d) is unspecified, continue searching",
@@ -1541,12 +1555,12 @@ RegisterContextUnwind::SavedLocationForRegister(
   }
 
   if (unwindplan_regloc.IsSame()) {
-    if (!IsFrameZero() &&
+    if (!m_all_registers_available &&
         (regnum.GetAsKind(eRegisterKindGeneric) == LLDB_REGNUM_GENERIC_PC ||
          regnum.GetAsKind(eRegisterKindGeneric) == LLDB_REGNUM_GENERIC_RA)) {
       UnwindLogMsg("register %s (%d) is marked as 'IsSame' - it is a pc or "
-                   "return address reg on a non-zero frame -- treat as if we "
-                   "have no information",
+                   "return address reg on a frame which does not have all "
+                   "registers available -- treat as if we have no information",
                    regnum.GetName(), regnum.GetAsKind(eRegisterKindLLDB));
       return UnwindLLDB::RegisterSearchResult::eRegisterNotFound;
     } else {
@@ -1642,16 +1656,19 @@ RegisterContextUnwind::SavedLocationForRegister(
                             process->GetByteOrder(),
                             process->GetAddressByteSize());
     ModuleSP opcode_ctx;
-    DWARFExpression dwarfexpr(opcode_ctx, dwarfdata, nullptr);
-    dwarfexpr.SetRegisterKind(unwindplan_registerkind);
+    DWARFExpressionList dwarfexpr(opcode_ctx, dwarfdata, nullptr);
+    dwarfexpr.GetMutableExpressionAtAddress()->SetRegisterKind(
+        unwindplan_registerkind);
     Value cfa_val = Scalar(m_cfa);
     cfa_val.SetValueType(Value::ValueType::LoadAddress);
-    Value result;
-    Status error;
-    if (dwarfexpr.Evaluate(&exe_ctx, this, 0, &cfa_val, nullptr, result,
-                           &error)) {
+    llvm::Expected<Value> result =
+        dwarfexpr.Evaluate(&exe_ctx, this, 0, &cfa_val, nullptr);
+    if (!result) {
+      LLDB_LOG_ERROR(log, result.takeError(),
+                     "DWARF expression failed to evaluate: {0}");
+    } else {
       addr_t val;
-      val = result.GetScalar().ULongLong();
+      val = result->GetScalar().ULongLong();
       if (unwindplan_regloc.IsDWARFExpression()) {
         regloc.type = UnwindLLDB::RegisterLocation::eRegisterValueInferred;
         regloc.location.inferred_value = val;
@@ -1730,7 +1747,7 @@ bool RegisterContextUnwind::TryFallbackUnwindPlan() {
 
   addr_t old_caller_pc_value = LLDB_INVALID_ADDRESS;
   addr_t new_caller_pc_value = LLDB_INVALID_ADDRESS;
-  UnwindLLDB::RegisterLocation regloc;
+  UnwindLLDB::RegisterLocation regloc = {};
   if (SavedLocationForRegister(pc_regnum.GetAsKind(eRegisterKindLLDB),
                                regloc) ==
       UnwindLLDB::RegisterSearchResult::eRegisterFound) {
@@ -1741,8 +1758,8 @@ bool RegisterContextUnwind::TryFallbackUnwindPlan() {
       if (ReadRegisterValueFromRegisterLocation(regloc, reg_info, reg_value)) {
         old_caller_pc_value = reg_value.GetAsUInt64();
         if (ProcessSP process_sp = m_thread.GetProcess()) {
-          if (ABISP abi = process_sp->GetABI())
-            old_caller_pc_value = abi->FixCodeAddress(old_caller_pc_value);
+          if (ABISP abi_sp = process_sp->GetABI())
+            old_caller_pc_value = abi_sp->FixCodeAddress(old_caller_pc_value);
         }
       }
     }
@@ -1801,8 +1818,8 @@ bool RegisterContextUnwind::TryFallbackUnwindPlan() {
                                                   reg_value)) {
           new_caller_pc_value = reg_value.GetAsUInt64();
           if (ProcessSP process_sp = m_thread.GetProcess()) {
-            if (ABISP abi = process_sp->GetABI())
-              new_caller_pc_value = abi->FixCodeAddress(new_caller_pc_value);
+            if (ABISP abi_sp = process_sp->GetABI())
+              new_caller_pc_value = abi_sp->FixCodeAddress(new_caller_pc_value);
           }
         }
       }
@@ -1943,6 +1960,7 @@ bool RegisterContextUnwind::ReadFrameAddress(
 
   address = LLDB_INVALID_ADDRESS;
   addr_t cfa_reg_contents;
+  ABISP abi_sp = m_thread.GetProcess()->GetABI();
 
   switch (fa.GetValueType()) {
   case UnwindPlan::Row::FAValue::isRegisterDereferenced: {
@@ -1953,11 +1971,13 @@ bool RegisterContextUnwind::ReadFrameAddress(
           GetRegisterInfoAtIndex(cfa_reg.GetAsKind(eRegisterKindLLDB));
       RegisterValue reg_value;
       if (reg_info) {
+        if (abi_sp)
+          cfa_reg_contents = abi_sp->FixDataAddress(cfa_reg_contents);
         Status error = ReadRegisterValueFromMemory(
             reg_info, cfa_reg_contents, reg_info->byte_size, reg_value);
         if (error.Success()) {
           address = reg_value.GetAsUInt64();
-          if (ABISP abi_sp = m_thread.GetProcess()->GetABI())
+          if (abi_sp)
             address = abi_sp->FixCodeAddress(address);
           UnwindLogMsg(
               "CFA value via dereferencing reg %s (%d): reg has val 0x%" PRIx64
@@ -1979,6 +1999,8 @@ bool RegisterContextUnwind::ReadFrameAddress(
     RegisterNumber cfa_reg(m_thread, row_register_kind,
                            fa.GetRegisterNumber());
     if (ReadGPRValue(cfa_reg, cfa_reg_contents)) {
+      if (abi_sp)
+        cfa_reg_contents = abi_sp->FixDataAddress(cfa_reg_contents);
       if (cfa_reg_contents == LLDB_INVALID_ADDRESS || cfa_reg_contents == 0 ||
           cfa_reg_contents == 1) {
         UnwindLogMsg(
@@ -2006,13 +2028,13 @@ bool RegisterContextUnwind::ReadFrameAddress(
                             process->GetByteOrder(),
                             process->GetAddressByteSize());
     ModuleSP opcode_ctx;
-    DWARFExpression dwarfexpr(opcode_ctx, dwarfdata, nullptr);
-    dwarfexpr.SetRegisterKind(row_register_kind);
-    Value result;
-    Status error;
-    if (dwarfexpr.Evaluate(&exe_ctx, this, 0, nullptr, nullptr, result,
-                           &error)) {
-      address = result.GetScalar().ULongLong();
+    DWARFExpressionList dwarfexpr(opcode_ctx, dwarfdata, nullptr);
+    dwarfexpr.GetMutableExpressionAtAddress()->SetRegisterKind(
+        row_register_kind);
+    llvm::Expected<Value> result =
+        dwarfexpr.Evaluate(&exe_ctx, this, 0, nullptr, nullptr);
+    if (result) {
+      address = result->GetScalar().ULongLong();
       if (ABISP abi_sp = m_thread.GetProcess()->GetABI())
         address = abi_sp->FixCodeAddress(address);
 
@@ -2021,7 +2043,7 @@ bool RegisterContextUnwind::ReadFrameAddress(
       return true;
     }
     UnwindLogMsg("Failed to set CFA value via DWARF expression: %s",
-                 error.AsCString());
+                 llvm::toString(result.takeError()).c_str());
     break;
   }
   case UnwindPlan::Row::FAValue::isRaSearch: {
@@ -2065,6 +2087,8 @@ lldb::addr_t RegisterContextUnwind::GetReturnAddressHint(int32_t plan_offset) {
     return LLDB_INVALID_ADDRESS;
   if (!m_sym_ctx.module_sp || !m_sym_ctx.symbol)
     return LLDB_INVALID_ADDRESS;
+  if (ABISP abi_sp = m_thread.GetProcess()->GetABI())
+    hint = abi_sp->FixCodeAddress(hint);
 
   hint += plan_offset;
 
@@ -2114,28 +2138,46 @@ bool RegisterContextUnwind::ReadGPRValue(lldb::RegisterKind register_kind,
   }
 
   const RegisterInfo *reg_info = GetRegisterInfoAtIndex(lldb_regnum);
+  assert(reg_info);
+  if (!reg_info) {
+    UnwindLogMsg(
+        "Could not find RegisterInfo definition for lldb register number %d",
+        lldb_regnum);
+    return false;
+  }
+
+  uint32_t generic_regnum = LLDB_INVALID_REGNUM;
+  if (register_kind == eRegisterKindGeneric)
+    generic_regnum = regnum;
+  else
+    m_thread.GetRegisterContext()->ConvertBetweenRegisterKinds(
+        register_kind, regnum, eRegisterKindGeneric, generic_regnum);
+  ABISP abi_sp = m_thread.GetProcess()->GetABI();
+
   RegisterValue reg_value;
   // if this is frame 0 (currently executing frame), get the requested reg
   // contents from the actual thread registers
   if (IsFrameZero()) {
     if (m_thread.GetRegisterContext()->ReadRegister(reg_info, reg_value)) {
       value = reg_value.GetAsUInt64();
+      if (abi_sp && generic_regnum != LLDB_INVALID_REGNUM) {
+        if (generic_regnum == LLDB_REGNUM_GENERIC_PC ||
+            generic_regnum == LLDB_REGNUM_GENERIC_RA)
+          value = abi_sp->FixCodeAddress(value);
+        if (generic_regnum == LLDB_REGNUM_GENERIC_SP ||
+            generic_regnum == LLDB_REGNUM_GENERIC_FP)
+          value = abi_sp->FixDataAddress(value);
+      }
       return true;
     }
     return false;
   }
 
   bool pc_register = false;
-  uint32_t generic_regnum;
-  if (register_kind == eRegisterKindGeneric &&
-      (regnum == LLDB_REGNUM_GENERIC_PC || regnum == LLDB_REGNUM_GENERIC_RA)) {
+  if (generic_regnum != LLDB_INVALID_REGNUM &&
+      (generic_regnum == LLDB_REGNUM_GENERIC_PC ||
+       generic_regnum == LLDB_REGNUM_GENERIC_RA))
     pc_register = true;
-  } else if (m_thread.GetRegisterContext()->ConvertBetweenRegisterKinds(
-                 register_kind, regnum, eRegisterKindGeneric, generic_regnum) &&
-             (generic_regnum == LLDB_REGNUM_GENERIC_PC ||
-              generic_regnum == LLDB_REGNUM_GENERIC_RA)) {
-    pc_register = true;
-  }
 
   lldb_private::UnwindLLDB::RegisterLocation regloc;
   if (!m_parent_unwind.SearchForSavedLocationForRegister(
@@ -2145,9 +2187,8 @@ bool RegisterContextUnwind::ReadGPRValue(lldb::RegisterKind register_kind,
   if (ReadRegisterValueFromRegisterLocation(regloc, reg_info, reg_value)) {
     value = reg_value.GetAsUInt64();
     if (pc_register) {
-      if (ProcessSP process_sp = m_thread.GetProcess()) {
-        if (ABISP abi = process_sp->GetABI())
-          value = abi->FixCodeAddress(value);
+      if (ABISP abi_sp = m_thread.GetProcess()->GetABI()) {
+        value = abi_sp->FixCodeAddress(value);
       }
     }
     return true;
@@ -2196,10 +2237,8 @@ bool RegisterContextUnwind::ReadRegister(const RegisterInfo *reg_info,
     if (is_pc_regnum && value.GetType() == RegisterValue::eTypeUInt64) {
       addr_t reg_value = value.GetAsUInt64(LLDB_INVALID_ADDRESS);
       if (reg_value != LLDB_INVALID_ADDRESS) {
-        if(ProcessSP process_sp = m_thread.GetProcess()) {
-          if (ABISP abi = process_sp->GetABI())
-            value = abi->FixCodeAddress(reg_value);
-        }
+        if (ABISP abi_sp = m_thread.GetProcess()->GetABI())
+          value = abi_sp->FixCodeAddress(reg_value);
       }
     }
   }
@@ -2281,9 +2320,8 @@ bool RegisterContextUnwind::GetStartPC(addr_t &start_pc) {
             ProcessSP process_sp (m_thread.GetProcess());
             if (process_sp)
             {
-                ABI *abi = process_sp->GetABI().get();
-                if (abi)
-                    start_pc = abi->FixCodeAddress(start_pc);
+              if (ABISP abi_sp = process_sp->GetABI())
+                start_pc = abi_sp->FixCodeAddress(start_pc);
             }
         }
         return read_successfully;
@@ -2311,13 +2349,8 @@ bool RegisterContextUnwind::ReadPC(addr_t &pc) {
     // through a NULL pointer -- we want to be able to unwind past that frame
     // to help find the bug.
 
-    ProcessSP process_sp (m_thread.GetProcess());
-    if (process_sp)
-    {
-        ABI *abi = process_sp->GetABI().get();
-        if (abi)
-            pc = abi->FixCodeAddress(pc);
-    }
+    if (ABISP abi_sp = m_thread.GetProcess()->GetABI())
+      pc = abi_sp->FixCodeAddress(pc);
 
     return !(m_all_registers_available == false &&
              above_trap_handler == false && (pc == 0 || pc == 1));

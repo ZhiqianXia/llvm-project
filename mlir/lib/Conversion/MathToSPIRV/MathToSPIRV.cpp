@@ -18,7 +18,9 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #define DEBUG_TYPE "math-to-spirv-pattern"
 
@@ -32,7 +34,7 @@ using namespace mlir;
 /// given type is not a 32-bit scalar/vector type.
 static Value getScalarOrVectorI32Constant(Type type, int value,
                                           OpBuilder &builder, Location loc) {
-  if (auto vectorType = type.dyn_cast<VectorType>()) {
+  if (auto vectorType = dyn_cast<VectorType>(type)) {
     if (!vectorType.getElementType().isInteger(32))
       return nullptr;
     SmallVector<int> values(vectorType.getNumElements(), value);
@@ -46,6 +48,48 @@ static Value getScalarOrVectorI32Constant(Type type, int value,
   return nullptr;
 }
 
+/// Check if the type is supported by math-to-spirv conversion. We expect to
+/// only see scalars and vectors at this point, with higher-level types already
+/// lowered.
+static bool isSupportedSourceType(Type originalType) {
+  if (originalType.isIntOrIndexOrFloat())
+    return true;
+
+  if (auto vecTy = dyn_cast<VectorType>(originalType)) {
+    if (!vecTy.getElementType().isIntOrIndexOrFloat())
+      return false;
+    if (vecTy.isScalable())
+      return false;
+    if (vecTy.getRank() > 1)
+      return false;
+
+    return true;
+  }
+
+  return false;
+}
+
+/// Check if all `sourceOp` types are supported by math-to-spirv conversion.
+/// Notify of a match failure othwerise and return a `failure` result.
+/// This is intended to simplify type checks in `OpConversionPattern`s.
+static LogicalResult checkSourceOpTypes(ConversionPatternRewriter &rewriter,
+                                        Operation *sourceOp) {
+  auto allTypes = llvm::to_vector(sourceOp->getOperandTypes());
+  llvm::append_range(allTypes, sourceOp->getResultTypes());
+
+  for (Type ty : allTypes) {
+    if (!isSupportedSourceType(ty)) {
+      return rewriter.notifyMatchFailure(
+          sourceOp,
+          llvm::formatv(
+              "unsupported source type for Math to SPIR-V conversion: {0}",
+              ty));
+    }
+  }
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // Operation conversion
 //===----------------------------------------------------------------------===//
@@ -55,22 +99,44 @@ static Value getScalarOrVectorI32Constant(Type type, int value,
 // normal RewritePattern.
 
 namespace {
+/// Converts elementwise unary, binary, and ternary standard operations to
+/// SPIR-V operations. Checks that source `Op` types are supported.
+template <typename Op, typename SPIRVOp>
+struct CheckedElementwiseOpPattern final
+    : public spirv::ElementwiseOpPattern<Op, SPIRVOp> {
+  using BasePattern = typename spirv::ElementwiseOpPattern<Op, SPIRVOp>;
+  using BasePattern::BasePattern;
+
+  LogicalResult
+  matchAndRewrite(Op op, typename Op::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (LogicalResult res = checkSourceOpTypes(rewriter, op); failed(res))
+      return res;
+
+    return BasePattern::matchAndRewrite(op, adaptor, rewriter);
+  }
+};
+
 /// Converts math.copysign to SPIR-V ops.
-class CopySignPattern final : public OpConversionPattern<math::CopySignOp> {
+struct CopySignPattern final : public OpConversionPattern<math::CopySignOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(math::CopySignOp copySignOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto type = getTypeConverter()->convertType(copySignOp.getType());
+    if (LogicalResult res = checkSourceOpTypes(rewriter, copySignOp);
+        failed(res))
+      return res;
+
+    Type type = getTypeConverter()->convertType(copySignOp.getType());
     if (!type)
       return failure();
 
     FloatType floatType;
-    if (auto scalarType = copySignOp.getType().dyn_cast<FloatType>()) {
+    if (auto scalarType = dyn_cast<FloatType>(copySignOp.getType())) {
       floatType = scalarType;
-    } else if (auto vectorType = copySignOp.getType().dyn_cast<VectorType>()) {
-      floatType = vectorType.getElementType().cast<FloatType>();
+    } else if (auto vectorType = dyn_cast<VectorType>(copySignOp.getType())) {
+      floatType = cast<FloatType>(vectorType.getElementType());
     } else {
       return failure();
     }
@@ -85,7 +151,7 @@ class CopySignPattern final : public OpConversionPattern<math::CopySignOp> {
     Value valueMask = rewriter.create<spirv::ConstantOp>(
         loc, intType, rewriter.getIntegerAttr(intType, intValue - 1u));
 
-    if (auto vectorType = copySignOp.getType().dyn_cast<VectorType>()) {
+    if (auto vectorType = dyn_cast<VectorType>(type)) {
       assert(vectorType.getRank() == 1);
       int count = vectorType.getNumElements();
       intType = VectorType::get(count, intType);
@@ -119,24 +185,27 @@ class CopySignPattern final : public OpConversionPattern<math::CopySignOp> {
 /// Converts math.ctlz to SPIR-V ops.
 ///
 /// SPIR-V does not have a direct operations for counting leading zeros. If
-/// Shader capability is supported, we can leverage GLSL FindUMsb to calculate
+/// Shader capability is supported, we can leverage GL FindUMsb to calculate
 /// it.
-class CountLeadingZerosPattern final
+struct CountLeadingZerosPattern final
     : public OpConversionPattern<math::CountLeadingZerosOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(math::CountLeadingZerosOp countOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto type = getTypeConverter()->convertType(countOp.getType());
+    if (LogicalResult res = checkSourceOpTypes(rewriter, countOp); failed(res))
+      return res;
+
+    Type type = getTypeConverter()->convertType(countOp.getType());
     if (!type)
       return failure();
 
     // We can only support 32-bit integer types for now.
     unsigned bitwidth = 0;
-    if (type.isa<IntegerType>())
+    if (isa<IntegerType>(type))
       bitwidth = type.getIntOrFloatBitWidth();
-    if (auto vectorType = type.dyn_cast<VectorType>())
+    if (auto vectorType = dyn_cast<VectorType>(type))
       bitwidth = vectorType.getElementTypeBitWidth();
     if (bitwidth != 32)
       return failure();
@@ -147,11 +216,11 @@ class CountLeadingZerosPattern final
     Value val31 = getScalarOrVectorI32Constant(type, 31, rewriter, loc);
     Value val32 = getScalarOrVectorI32Constant(type, 32, rewriter, loc);
 
-    Value msb = rewriter.create<spirv::GLSLFindUMsbOp>(loc, input);
+    Value msb = rewriter.create<spirv::GLFindUMsbOp>(loc, input);
     // We need to subtract from 31 given that the index returned by GLSL
     // FindUMsb is counted from the least significant bit. Theoretically this
     // also gives the correct result even if the integer has all zero bits, in
-    // which case GLSL FindUMsb would return -1.
+    // which case GL FindUMsb would return -1.
     Value subMsb = rewriter.create<spirv::ISubOp>(loc, val31, msb);
     // However, certain Vulkan implementations have driver bugs for the corner
     // case where the input is zero. And.. it can be smart to optimize a select
@@ -177,9 +246,16 @@ struct ExpM1OpPattern final : public OpConversionPattern<math::ExpM1Op> {
   matchAndRewrite(math::ExpM1Op operation, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     assert(adaptor.getOperands().size() == 1);
+    if (LogicalResult res = checkSourceOpTypes(rewriter, operation);
+        failed(res))
+      return res;
+
     Location loc = operation.getLoc();
-    auto type = this->getTypeConverter()->convertType(operation.getType());
-    auto exp = rewriter.create<ExpOp>(loc, type, adaptor.getOperand());
+    Type type = this->getTypeConverter()->convertType(operation.getType());
+    if (!type)
+      return failure();
+
+    Value exp = rewriter.create<ExpOp>(loc, type, adaptor.getOperand());
     auto one = spirv::ConstantOp::getOne(type, loc, rewriter);
     rewriter.replaceOpWithNewOp<spirv::FSubOp>(operation, exp, one);
     return success();
@@ -198,10 +274,17 @@ struct Log1pOpPattern final : public OpConversionPattern<math::Log1pOp> {
   matchAndRewrite(math::Log1pOp operation, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     assert(adaptor.getOperands().size() == 1);
+    if (LogicalResult res = checkSourceOpTypes(rewriter, operation);
+        failed(res))
+      return res;
+
     Location loc = operation.getLoc();
-    auto type = this->getTypeConverter()->convertType(operation.getType());
+    Type type = this->getTypeConverter()->convertType(operation.getType());
+    if (!type)
+      return failure();
+
     auto one = spirv::ConstantOp::getOne(type, operation.getLoc(), rewriter);
-    auto onePlus =
+    Value onePlus =
         rewriter.create<spirv::FAddOp>(loc, one, adaptor.getOperand());
     rewriter.replaceOpWithNewOp<LogOp>(operation, type, onePlus);
     return success();
@@ -215,21 +298,60 @@ struct PowFOpPattern final : public OpConversionPattern<math::PowFOp> {
   LogicalResult
   matchAndRewrite(math::PowFOp powfOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto dstType = getTypeConverter()->convertType(powfOp.getType());
+    if (LogicalResult res = checkSourceOpTypes(rewriter, powfOp); failed(res))
+      return res;
+
+    Type dstType = getTypeConverter()->convertType(powfOp.getType());
     if (!dstType)
       return failure();
 
-    // Per GLSL Pow extended instruction spec:
+    // Get the scalar float type.
+    FloatType scalarFloatType;
+    if (auto scalarType = dyn_cast<FloatType>(powfOp.getType())) {
+      scalarFloatType = scalarType;
+    } else if (auto vectorType = dyn_cast<VectorType>(powfOp.getType())) {
+      scalarFloatType = cast<FloatType>(vectorType.getElementType());
+    } else {
+      return failure();
+    }
+
+    // Get int type of the same shape as the float type.
+    Type scalarIntType = rewriter.getIntegerType(32);
+    Type intType = scalarIntType;
+    if (auto vectorType = dyn_cast<VectorType>(adaptor.getRhs().getType())) {
+      auto shape = vectorType.getShape();
+      intType = VectorType::get(shape, scalarIntType);
+    }
+
+    // Per GL Pow extended instruction spec:
     // "Result is undefined if x < 0. Result is undefined if x = 0 and y <= 0."
     Location loc = powfOp.getLoc();
     Value zero =
         spirv::ConstantOp::getZero(adaptor.getLhs().getType(), loc, rewriter);
     Value lessThan =
         rewriter.create<spirv::FOrdLessThanOp>(loc, adaptor.getLhs(), zero);
-    Value abs = rewriter.create<spirv::GLSLFAbsOp>(loc, adaptor.getLhs());
-    Value pow = rewriter.create<spirv::GLSLPowOp>(loc, abs, adaptor.getRhs());
+    Value abs = rewriter.create<spirv::GLFAbsOp>(loc, adaptor.getLhs());
+
+    // TODO: The following just forcefully casts y into an integer value in
+    // order to properly propagate the sign, assuming integer y cases. It
+    // doesn't cover other cases and should be fixed.
+
+    // Cast exponent to integer and calculate exponent % 2 != 0.
+    Value intRhs =
+        rewriter.create<spirv::ConvertFToSOp>(loc, intType, adaptor.getRhs());
+    Value intOne = spirv::ConstantOp::getOne(intType, loc, rewriter);
+    Value bitwiseAndOne =
+        rewriter.create<spirv::BitwiseAndOp>(loc, intRhs, intOne);
+    Value isOdd = rewriter.create<spirv::IEqualOp>(loc, bitwiseAndOne, intOne);
+
+    // calculate pow based on abs(lhs)^rhs.
+    Value pow = rewriter.create<spirv::GLPowOp>(loc, abs, adaptor.getRhs());
     Value negate = rewriter.create<spirv::FNegateOp>(loc, pow);
-    rewriter.replaceOpWithNewOp<spirv::SelectOp>(powfOp, lessThan, negate, pow);
+    // if the exponent is odd and lhs < 0, negate the result.
+    Value shouldNegate =
+        rewriter.create<spirv::LogicalAndOp>(loc, lessThan, isOdd);
+    rewriter.replaceOpWithNewOp<spirv::SelectOp>(powfOp, shouldNegate, negate,
+                                                 pow);
     return success();
   }
 };
@@ -241,15 +363,18 @@ struct RoundOpPattern final : public OpConversionPattern<math::RoundOp> {
   LogicalResult
   matchAndRewrite(math::RoundOp roundOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    if (LogicalResult res = checkSourceOpTypes(rewriter, roundOp); failed(res))
+      return res;
+
     Location loc = roundOp.getLoc();
-    auto operand = roundOp.getOperand();
-    auto ty = operand.getType();
-    auto ety = getElementTypeOrSelf(ty);
+    Value operand = roundOp.getOperand();
+    Type ty = operand.getType();
+    Type ety = getElementTypeOrSelf(ty);
 
     auto zero = spirv::ConstantOp::getZero(ty, loc, rewriter);
     auto one = spirv::ConstantOp::getOne(ty, loc, rewriter);
     Value half;
-    if (VectorType vty = ty.dyn_cast<VectorType>()) {
+    if (VectorType vty = dyn_cast<VectorType>(ty)) {
       half = rewriter.create<spirv::ConstantOp>(
           loc, vty,
           DenseElementsAttr::get(vty,
@@ -259,8 +384,8 @@ struct RoundOpPattern final : public OpConversionPattern<math::RoundOp> {
           loc, ty, rewriter.getFloatAttr(ety, 0.5));
     }
 
-    auto abs = rewriter.create<spirv::GLSLFAbsOp>(loc, operand);
-    auto floor = rewriter.create<spirv::GLSLFloorOp>(loc, abs);
+    auto abs = rewriter.create<spirv::GLFAbsOp>(loc, operand);
+    auto floor = rewriter.create<spirv::GLFloorOp>(loc, abs);
     auto sub = rewriter.create<spirv::FSubOp>(loc, abs, floor);
     auto greater =
         rewriter.create<spirv::FOrdGreaterThanEqualOp>(loc, sub, half);
@@ -285,37 +410,41 @@ void populateMathToSPIRVPatterns(SPIRVTypeConverter &typeConverter,
 
   // GLSL patterns
   patterns
-      .add<CountLeadingZerosPattern, Log1pOpPattern<spirv::GLSLLogOp>,
-           ExpM1OpPattern<spirv::GLSLExpOp>, PowFOpPattern, RoundOpPattern,
-           spirv::ElementwiseOpPattern<math::AbsOp, spirv::GLSLFAbsOp>,
-           spirv::ElementwiseOpPattern<math::CeilOp, spirv::GLSLCeilOp>,
-           spirv::ElementwiseOpPattern<math::CosOp, spirv::GLSLCosOp>,
-           spirv::ElementwiseOpPattern<math::ExpOp, spirv::GLSLExpOp>,
-           spirv::ElementwiseOpPattern<math::FloorOp, spirv::GLSLFloorOp>,
-           spirv::ElementwiseOpPattern<math::FmaOp, spirv::GLSLFmaOp>,
-           spirv::ElementwiseOpPattern<math::LogOp, spirv::GLSLLogOp>,
-           spirv::ElementwiseOpPattern<math::RsqrtOp, spirv::GLSLInverseSqrtOp>,
-           spirv::ElementwiseOpPattern<math::SinOp, spirv::GLSLSinOp>,
-           spirv::ElementwiseOpPattern<math::SqrtOp, spirv::GLSLSqrtOp>,
-           spirv::ElementwiseOpPattern<math::TanhOp, spirv::GLSLTanhOp>>(
+      .add<CountLeadingZerosPattern, Log1pOpPattern<spirv::GLLogOp>,
+           ExpM1OpPattern<spirv::GLExpOp>, PowFOpPattern, RoundOpPattern,
+           CheckedElementwiseOpPattern<math::AbsFOp, spirv::GLFAbsOp>,
+           CheckedElementwiseOpPattern<math::AbsIOp, spirv::GLSAbsOp>,
+           CheckedElementwiseOpPattern<math::CeilOp, spirv::GLCeilOp>,
+           CheckedElementwiseOpPattern<math::CosOp, spirv::GLCosOp>,
+           CheckedElementwiseOpPattern<math::ExpOp, spirv::GLExpOp>,
+           CheckedElementwiseOpPattern<math::FloorOp, spirv::GLFloorOp>,
+           CheckedElementwiseOpPattern<math::FmaOp, spirv::GLFmaOp>,
+           CheckedElementwiseOpPattern<math::LogOp, spirv::GLLogOp>,
+           CheckedElementwiseOpPattern<math::RoundEvenOp, spirv::GLRoundEvenOp>,
+           CheckedElementwiseOpPattern<math::RsqrtOp, spirv::GLInverseSqrtOp>,
+           CheckedElementwiseOpPattern<math::SinOp, spirv::GLSinOp>,
+           CheckedElementwiseOpPattern<math::SqrtOp, spirv::GLSqrtOp>,
+           CheckedElementwiseOpPattern<math::TanhOp, spirv::GLTanhOp>>(
           typeConverter, patterns.getContext());
 
   // OpenCL patterns
-  patterns.add<Log1pOpPattern<spirv::OCLLogOp>, ExpM1OpPattern<spirv::OCLExpOp>,
-               spirv::ElementwiseOpPattern<math::AbsOp, spirv::OCLFAbsOp>,
-               spirv::ElementwiseOpPattern<math::CeilOp, spirv::OCLCeilOp>,
-               spirv::ElementwiseOpPattern<math::CosOp, spirv::OCLCosOp>,
-               spirv::ElementwiseOpPattern<math::ErfOp, spirv::OCLErfOp>,
-               spirv::ElementwiseOpPattern<math::ExpOp, spirv::OCLExpOp>,
-               spirv::ElementwiseOpPattern<math::FloorOp, spirv::OCLFloorOp>,
-               spirv::ElementwiseOpPattern<math::FmaOp, spirv::OCLFmaOp>,
-               spirv::ElementwiseOpPattern<math::LogOp, spirv::OCLLogOp>,
-               spirv::ElementwiseOpPattern<math::PowFOp, spirv::OCLPowOp>,
-               spirv::ElementwiseOpPattern<math::RoundOp, spirv::OCLRoundOp>,
-               spirv::ElementwiseOpPattern<math::RsqrtOp, spirv::OCLRsqrtOp>,
-               spirv::ElementwiseOpPattern<math::SinOp, spirv::OCLSinOp>,
-               spirv::ElementwiseOpPattern<math::SqrtOp, spirv::OCLSqrtOp>,
-               spirv::ElementwiseOpPattern<math::TanhOp, spirv::OCLTanhOp>>(
+  patterns.add<Log1pOpPattern<spirv::CLLogOp>, ExpM1OpPattern<spirv::CLExpOp>,
+               CheckedElementwiseOpPattern<math::AbsFOp, spirv::CLFAbsOp>,
+               CheckedElementwiseOpPattern<math::AbsIOp, spirv::CLSAbsOp>,
+               CheckedElementwiseOpPattern<math::CeilOp, spirv::CLCeilOp>,
+               CheckedElementwiseOpPattern<math::CosOp, spirv::CLCosOp>,
+               CheckedElementwiseOpPattern<math::ErfOp, spirv::CLErfOp>,
+               CheckedElementwiseOpPattern<math::ExpOp, spirv::CLExpOp>,
+               CheckedElementwiseOpPattern<math::FloorOp, spirv::CLFloorOp>,
+               CheckedElementwiseOpPattern<math::FmaOp, spirv::CLFmaOp>,
+               CheckedElementwiseOpPattern<math::LogOp, spirv::CLLogOp>,
+               CheckedElementwiseOpPattern<math::PowFOp, spirv::CLPowOp>,
+               CheckedElementwiseOpPattern<math::RoundEvenOp, spirv::CLRintOp>,
+               CheckedElementwiseOpPattern<math::RoundOp, spirv::CLRoundOp>,
+               CheckedElementwiseOpPattern<math::RsqrtOp, spirv::CLRsqrtOp>,
+               CheckedElementwiseOpPattern<math::SinOp, spirv::CLSinOp>,
+               CheckedElementwiseOpPattern<math::SqrtOp, spirv::CLSqrtOp>,
+               CheckedElementwiseOpPattern<math::TanhOp, spirv::CLTanhOp>>(
       typeConverter, patterns.getContext());
 }
 

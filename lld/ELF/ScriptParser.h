@@ -12,8 +12,7 @@
 #include "lld/Common/LLVM.h"
 #include "llvm/Support/MemoryBufferRef.h"
 
-namespace lld {
-namespace elf {
+namespace lld::elf {
 
 // Parses a linker script. Calling this function updates
 // lld::elf::config and lld::elf::script.
@@ -25,11 +24,10 @@ void readVersionScript(MemoryBufferRef mb);
 void readDynamicList(MemoryBufferRef mb);
 
 // Parses the defsym expression.
-void readDefsym(StringRef name, MemoryBufferRef mb);
+void readDefsym(MemoryBufferRef mb);
 
 bool hasWildcard(StringRef s);
 
-} // namespace elf
-} // namespace lld
+} // namespace lld::elf
 
 #endif

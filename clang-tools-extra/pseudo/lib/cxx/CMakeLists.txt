@@ -12,3 +12,8 @@ add_clang_library(clangPseudoCXX
   clangPseudo
   clangPseudoGrammar
   )
+
+clang_target_link_libraries(clangPseudoCXX
+  PRIVATE
+  clangBasic
+  )

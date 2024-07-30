@@ -67,13 +67,18 @@ public:
     return simplifyBinOp(Opc, LHS, RHS, FMF, SQ);
   }
 
-  Value *FoldICmp(CmpInst::Predicate P, Value *LHS, Value *RHS) const override {
-    return simplifyICmpInst(P, LHS, RHS, SQ);
+  Value *FoldUnOpFMF(Instruction::UnaryOps Opc, Value *V,
+                      FastMathFlags FMF) const override {
+    return simplifyUnOp(Opc, V, FMF, SQ);
+  }
+
+  Value *FoldCmp(CmpInst::Predicate P, Value *LHS, Value *RHS) const override {
+    return simplifyCmpInst(P, LHS, RHS, SQ);
   }
 
   Value *FoldGEP(Type *Ty, Value *Ptr, ArrayRef<Value *> IdxList,
-                 bool IsInBounds = false) const override {
-    return simplifyGEPInst(Ty, Ptr, IdxList, IsInBounds, SQ);
+                 GEPNoWrapFlags NW) const override {
+    return simplifyGEPInst(Ty, Ptr, IdxList, NW, SQ);
   }
 
   Value *FoldSelect(Value *C, Value *True, Value *False) const override {
@@ -107,67 +112,25 @@ public:
     return simplifyShuffleVectorInst(V1, V2, Mask, RetTy, SQ);
   }
 
-  //===--------------------------------------------------------------------===//
-  // Unary Operators
-  //===--------------------------------------------------------------------===//
-
-  Value *CreateFNeg(Constant *C) const override {
-    return ConstFolder.CreateFNeg(C);
+  Value *FoldCast(Instruction::CastOps Op, Value *V,
+                  Type *DestTy) const override {
+    return simplifyCastInst(Op, V, DestTy, SQ);
   }
 
-  Value *CreateUnOp(Instruction::UnaryOps Opc, Constant *C) const override {
-    return ConstFolder.CreateUnOp(Opc, C);
+  Value *FoldBinaryIntrinsic(Intrinsic::ID ID, Value *LHS, Value *RHS, Type *Ty,
+                             Instruction *FMFSource) const override {
+    return simplifyBinaryIntrinsic(ID, Ty, LHS, RHS, SQ,
+                                   dyn_cast_if_present<CallBase>(FMFSource));
   }
 
   //===--------------------------------------------------------------------===//
   // Cast/Conversion Operators
   //===--------------------------------------------------------------------===//
 
-  Value *CreateCast(Instruction::CastOps Op, Constant *C,
-                    Type *DestTy) const override {
-    if (C->getType() == DestTy)
-      return C; // avoid calling Fold
-    return ConstFolder.CreateCast(Op, C, DestTy);
-  }
-  Value *CreateIntCast(Constant *C, Type *DestTy,
-                       bool isSigned) const override {
-    if (C->getType() == DestTy)
-      return C; // avoid calling Fold
-    return ConstFolder.CreateIntCast(C, DestTy, isSigned);
-  }
   Value *CreatePointerCast(Constant *C, Type *DestTy) const override {
     if (C->getType() == DestTy)
       return C; // avoid calling Fold
     return ConstFolder.CreatePointerCast(C, DestTy);
-  }
-  Value *CreateFPCast(Constant *C, Type *DestTy) const override {
-    if (C->getType() == DestTy)
-      return C; // avoid calling Fold
-    return ConstFolder.CreateFPCast(C, DestTy);
-  }
-  Value *CreateBitCast(Constant *C, Type *DestTy) const override {
-    return ConstFolder.CreateBitCast(C, DestTy);
-  }
-  Value *CreateIntToPtr(Constant *C, Type *DestTy) const override {
-    return ConstFolder.CreateIntToPtr(C, DestTy);
-  }
-  Value *CreatePtrToInt(Constant *C, Type *DestTy) const override {
-    return ConstFolder.CreatePtrToInt(C, DestTy);
-  }
-  Value *CreateZExtOrBitCast(Constant *C, Type *DestTy) const override {
-    if (C->getType() == DestTy)
-      return C; // avoid calling Fold
-    return ConstFolder.CreateZExtOrBitCast(C, DestTy);
-  }
-  Value *CreateSExtOrBitCast(Constant *C, Type *DestTy) const override {
-    if (C->getType() == DestTy)
-      return C; // avoid calling Fold
-    return ConstFolder.CreateSExtOrBitCast(C, DestTy);
-  }
-  Value *CreateTruncOrBitCast(Constant *C, Type *DestTy) const override {
-    if (C->getType() == DestTy)
-      return C; // avoid calling Fold
-    return ConstFolder.CreateTruncOrBitCast(C, DestTy);
   }
 
   Value *CreatePointerBitCastOrAddrSpaceCast(Constant *C,
@@ -175,15 +138,6 @@ public:
     if (C->getType() == DestTy)
       return C; // avoid calling Fold
     return ConstFolder.CreatePointerBitCastOrAddrSpaceCast(C, DestTy);
-  }
-
-  //===--------------------------------------------------------------------===//
-  // Compare Instructions
-  //===--------------------------------------------------------------------===//
-
-  Value *CreateFCmp(CmpInst::Predicate P, Constant *LHS,
-                    Constant *RHS) const override {
-    return ConstFolder.CreateFCmp(P, LHS, RHS);
   }
 };
 

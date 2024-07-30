@@ -12,6 +12,7 @@
 
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/LLVMContext.h"
@@ -31,6 +32,7 @@
 
 using namespace llvm;
 
+extern cl::opt<bool> UseNewDbgInfoFormat;
 // See PassManagers.h for Pass Manager infrastructure overview.
 
 //===----------------------------------------------------------------------===//
@@ -527,6 +529,11 @@ bool PassManagerImpl::run(Module &M) {
   dumpArguments();
   dumpPasses();
 
+  // RemoveDIs: if a command line flag is given, convert to the
+  // DbgVariableRecord representation of debug-info for the duration of these
+  // passes.
+  ScopedDbgInfoFormatSetter FormatSetter(M, UseNewDbgInfoFormat);
+
   for (ImmutablePass *ImPass : getImmutablePasses())
     Changed |= ImPass->doInitialization(M);
 
@@ -817,9 +824,8 @@ void PMTopLevelManager::dumpPasses() const {
     return;
 
   // Print out the immutable passes
-  for (unsigned i = 0, e = ImmutablePasses.size(); i != e; ++i) {
-    ImmutablePasses[i]->dumpPassStructure(0);
-  }
+  for (ImmutablePass *Pass : ImmutablePasses)
+    Pass->dumpPassStructure(0);
 
   // Every class that derives from PMDataManager also derives from Pass
   // (sometimes indirectly), but there's no inheritance relationship
@@ -1408,15 +1414,21 @@ bool FPPassManager::runOnFunction(Function &F) {
     FunctionSize = F.getInstructionCount();
   }
 
-  llvm::TimeTraceScope FunctionScope("OptFunction", F.getName());
+  // Store name outside of loop to avoid redundant calls.
+  const StringRef Name = F.getName();
+  llvm::TimeTraceScope FunctionScope(
+      "OptFunction", [&F]() { return demangle(F.getName().str()); });
 
   for (unsigned Index = 0; Index < getNumContainedPasses(); ++Index) {
     FunctionPass *FP = getContainedPass(Index);
     bool LocalChanged = false;
 
-    llvm::TimeTraceScope PassScope("RunPass", FP->getPassName());
+    // Call getPassName only when required. The call itself is fairly cheap, but
+    // still virtual and repeated calling adds unnecessary overhead.
+    llvm::TimeTraceScope PassScope(
+        "RunPass", [FP]() { return std::string(FP->getPassName()); });
 
-    dumpPassInfo(FP, EXECUTION_MSG, ON_FUNCTION_MSG, F.getName());
+    dumpPassInfo(FP, EXECUTION_MSG, ON_FUNCTION_MSG, Name);
     dumpRequiredSet(FP);
 
     initializeAnalysisImpl(FP);
@@ -1455,7 +1467,7 @@ bool FPPassManager::runOnFunction(Function &F) {
 
     Changed |= LocalChanged;
     if (LocalChanged)
-      dumpPassInfo(FP, MODIFICATION_MSG, ON_FUNCTION_MSG, F.getName());
+      dumpPassInfo(FP, MODIFICATION_MSG, ON_FUNCTION_MSG, Name);
     dumpPreservedSet(FP);
     dumpUsedSet(FP);
 
@@ -1463,7 +1475,7 @@ bool FPPassManager::runOnFunction(Function &F) {
     if (LocalChanged)
       removeNotPreservedAnalysis(FP);
     recordAvailableAnalysis(FP);
-    removeDeadPasses(FP, F.getName(), ON_FUNCTION_MSG);
+    removeDeadPasses(FP, Name, ON_FUNCTION_MSG);
   }
 
   return Changed;

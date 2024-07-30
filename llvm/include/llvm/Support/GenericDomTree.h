@@ -14,7 +14,8 @@
 ///
 /// Unlike ADT/* graph algorithms, generic dominator tree has more requirements
 /// on the graph's NodeRef. The NodeRef should be a pointer and,
-/// NodeRef->getParent() must return the parent node that is also a pointer.
+/// either NodeRef->getParent() must return the parent node that is also a
+/// pointer or DomTreeNodeTraits needs to be specialized.
 ///
 /// FIXME: Maybe GenericDomTree needs a TreeTraits, instead of GraphTraits.
 ///
@@ -89,11 +90,7 @@ template <class NodeT> class DomTreeNodeBase {
   DomTreeNodeBase *getIDom() const { return IDom; }
   unsigned getLevel() const { return Level; }
 
-  std::unique_ptr<DomTreeNodeBase> addChild(
-      std::unique_ptr<DomTreeNodeBase> C) {
-    Children.push_back(C.get());
-    return C;
-  }
+  void addChild(DomTreeNodeBase *C) { Children.push_back(C); }
 
   bool isLeaf() const { return Children.empty(); }
   size_t getNumChildren() const { return Children.size(); }
@@ -186,10 +183,8 @@ template <class NodeT>
 void PrintDomTree(const DomTreeNodeBase<NodeT> *N, raw_ostream &O,
                   unsigned Lev) {
   O.indent(2 * Lev) << "[" << Lev << "] " << N;
-  for (typename DomTreeNodeBase<NodeT>::const_iterator I = N->begin(),
-                                                       E = N->end();
-       I != E; ++I)
-    PrintDomTree<NodeT>(*I, O, Lev + 1);
+  for (const auto &I : *N)
+    PrintDomTree<NodeT>(I, O, Lev + 1);
 }
 
 namespace DomTreeBuilder {
@@ -220,6 +215,20 @@ template <typename DomTreeT>
 bool Verify(const DomTreeT &DT, typename DomTreeT::VerificationLevel VL);
 }  // namespace DomTreeBuilder
 
+/// Default DomTreeNode traits for NodeT. The default implementation assume a
+/// Function-like NodeT. Can be specialized to support different node types.
+template <typename NodeT> struct DomTreeNodeTraits {
+  using NodeType = NodeT;
+  using NodePtr = NodeT *;
+  using ParentPtr = decltype(std::declval<NodePtr>()->getParent());
+  static_assert(std::is_pointer_v<ParentPtr>,
+                "Currently NodeT's parent must be a pointer type");
+  using ParentType = std::remove_pointer_t<ParentPtr>;
+
+  static NodeT *getEntryNode(ParentPtr Parent) { return &Parent->front(); }
+  static ParentPtr getParent(NodePtr BB) { return BB->getParent(); }
+};
+
 /// Core dominator tree base class.
 ///
 /// This class is a generic template over graph nodes. It is instantiated for
@@ -227,12 +236,13 @@ bool Verify(const DomTreeT &DT, typename DomTreeT::VerificationLevel VL);
 template <typename NodeT, bool IsPostDom>
 class DominatorTreeBase {
  public:
-  static_assert(std::is_pointer<typename GraphTraits<NodeT *>::NodeRef>::value,
+  static_assert(std::is_pointer_v<typename GraphTraits<NodeT *>::NodeRef>,
                 "Currently DominatorTreeBase supports only pointer nodes");
-  using NodeType = NodeT;
-  using NodePtr = NodeT *;
-  using ParentPtr = decltype(std::declval<NodeT *>()->getParent());
-  static_assert(std::is_pointer<ParentPtr>::value,
+  using NodeTrait = DomTreeNodeTraits<NodeT>;
+  using NodeType = typename NodeTrait::NodeType;
+  using NodePtr = typename NodeTrait::NodePtr;
+  using ParentPtr = typename NodeTrait::ParentPtr;
+  static_assert(std::is_pointer_v<ParentPtr>,
                 "Currently NodeT's parent must be a pointer type");
   using ParentType = std::remove_pointer_t<ParentPtr>;
   static constexpr bool IsPostDominator = IsPostDom;
@@ -467,13 +477,14 @@ protected:
   /// must have tree nodes.
   NodeT *findNearestCommonDominator(NodeT *A, NodeT *B) const {
     assert(A && B && "Pointers are not valid");
-    assert(A->getParent() == B->getParent() &&
+    assert(NodeTrait::getParent(A) == NodeTrait::getParent(B) &&
            "Two blocks are not in same function");
 
     // If either A or B is a entry block then it is nearest common dominator
     // (for forward-dominators).
     if (!isPostDominator()) {
-      NodeT &Entry = A->getParent()->front();
+      NodeT &Entry =
+          *DomTreeNodeTraits<NodeT>::getEntryNode(NodeTrait::getParent(A));
       if (A == &Entry || B == &Entry)
         return &Entry;
     }
@@ -584,8 +595,8 @@ protected:
   void insertEdge(NodeT *From, NodeT *To) {
     assert(From);
     assert(To);
-    assert(From->getParent() == Parent);
-    assert(To->getParent() == Parent);
+    assert(NodeTrait::getParent(From) == Parent);
+    assert(NodeTrait::getParent(To) == Parent);
     DomTreeBuilder::InsertEdge(*this, From, To);
   }
 
@@ -602,8 +613,8 @@ protected:
   void deleteEdge(NodeT *From, NodeT *To) {
     assert(From);
     assert(To);
-    assert(From->getParent() == Parent);
-    assert(To->getParent() == Parent);
+    assert(NodeTrait::getParent(From) == Parent);
+    assert(NodeTrait::getParent(To) == Parent);
     DomTreeBuilder::DeleteEdge(*this, From, To);
   }
 
@@ -621,7 +632,7 @@ protected:
     DomTreeNodeBase<NodeT> *IDomNode = getNode(DomBB);
     assert(IDomNode && "Not immediate dominator specified for block!");
     DFSInfoValid = false;
-    return createChild(BB, IDomNode);
+    return createNode(BB, IDomNode);
   }
 
   /// Add a new node to the forward dominator tree and make it a new root.
@@ -640,8 +651,8 @@ protected:
     } else {
       assert(Roots.size() == 1);
       NodeT *OldRoot = Roots.front();
-      auto &OldNode = DomTreeNodes[OldRoot];
-      OldNode = NewNode->addChild(std::move(DomTreeNodes[OldRoot]));
+      DomTreeNodeBase<NodeT> *OldNode = getNode(OldRoot);
+      NewNode->addChild(OldNode);
       OldNode->IDom = NewNode;
       OldNode->UpdateLevel();
       Roots[0] = BB;
@@ -680,7 +691,8 @@ protected:
       assert(I != IDom->Children.end() &&
              "Not in immediate dominator children set!");
       // I am no longer your child...
-      IDom->Children.erase(I);
+      std::swap(*I, IDom->Children.back());
+      IDom->Children.pop_back();
     }
 
     DomTreeNodes.erase(BB);
@@ -815,16 +827,14 @@ public:
 protected:
   void addRoot(NodeT *BB) { this->Roots.push_back(BB); }
 
-  DomTreeNodeBase<NodeT> *createChild(NodeT *BB, DomTreeNodeBase<NodeT> *IDom) {
-    return (DomTreeNodes[BB] = IDom->addChild(
-                std::make_unique<DomTreeNodeBase<NodeT>>(BB, IDom)))
-        .get();
-  }
-
-  DomTreeNodeBase<NodeT> *createNode(NodeT *BB) {
-    return (DomTreeNodes[BB] =
-                std::make_unique<DomTreeNodeBase<NodeT>>(BB, nullptr))
-        .get();
+  DomTreeNodeBase<NodeT> *createNode(NodeT *BB,
+                                     DomTreeNodeBase<NodeT> *IDom = nullptr) {
+    auto Node = std::make_unique<DomTreeNodeBase<NodeT>>(BB, IDom);
+    auto *NodePtr = Node.get();
+    DomTreeNodes[BB] = std::move(Node);
+    if (IDom)
+      IDom->addChild(NodePtr);
+    return NodePtr;
   }
 
   // NewBB is split and now it has one successor. Update dominator tree to
@@ -833,17 +843,16 @@ protected:
   void Split(typename GraphTraits<N>::NodeRef NewBB) {
     using GraphT = GraphTraits<N>;
     using NodeRef = typename GraphT::NodeRef;
-    assert(std::distance(GraphT::child_begin(NewBB),
-                         GraphT::child_end(NewBB)) == 1 &&
+    assert(llvm::hasSingleElement(children<N>(NewBB)) &&
            "NewBB should have a single successor!");
     NodeRef NewBBSucc = *GraphT::child_begin(NewBB);
 
-    SmallVector<NodeRef, 4> PredBlocks(children<Inverse<N>>(NewBB));
+    SmallVector<NodeRef, 4> PredBlocks(inverse_children<N>(NewBB));
 
     assert(!PredBlocks.empty() && "No predblocks?");
 
     bool NewBBDominatesNewBBSucc = true;
-    for (auto Pred : children<Inverse<N>>(NewBBSucc)) {
+    for (auto *Pred : inverse_children<N>(NewBBSucc)) {
       if (Pred != NewBB && !dominates(NewBBSucc, Pred) &&
           isReachableFromEntry(Pred)) {
         NewBBDominatesNewBBSucc = false;

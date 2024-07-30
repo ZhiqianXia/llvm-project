@@ -23,13 +23,10 @@
 #include <cstdint>
 #include <limits>
 #include <string>
-#include <vector>
 
 namespace llvm {
 
 class Triple;
-class FunctionPass;
-class ModulePass;
 class OptimizationRemarkEmitter;
 class Comdat;
 class CallBase;
@@ -51,6 +48,12 @@ GlobalVariable *createPrivateGlobalForString(Module &M, StringRef Str,
 // Otherwise creates a new comdat, sets F's comdat, and returns it.
 // Returns nullptr on failure.
 Comdat *getOrCreateFunctionComdat(Function &F, Triple &T);
+
+// Place global in a large section for x86-64 ELF binaries to mitigate
+// relocation overflow pressure. This can be be used for metadata globals that
+// aren't directly accessed by code, which has no performance impact.
+void setGlobalVariableLargeSection(const Triple &TargetTriple,
+                                   GlobalVariable &GV);
 
 // Insert GCOV profiling instrumentation
 struct GCOVOptions {
@@ -78,8 +81,6 @@ struct GCOVOptions {
   // Regexes separated by a semi-colon to filter the files to not instrument.
   std::string Exclude;
 };
-
-ModulePass *createCGProfileLegacyPass();
 
 // The pgo-specific indirect call promotion function declared below is used by
 // the pgo-driven indirect call promotion and sample profile passes. It's a
@@ -120,22 +121,17 @@ struct InstrProfOptions {
   // Use BFI to guide register promotion
   bool UseBFIInPromotion = false;
 
+  // Use sampling to reduce the profile instrumentation runtime overhead.
+  bool Sampling = false;
+
   // Name of the profile file to use as output
   std::string InstrProfileOutput;
 
   InstrProfOptions() = default;
 };
 
-/// Insert frontend instrumentation based profiling. Parameter IsCS indicates if
-// this is the context sensitive instrumentation.
-ModulePass *createInstrProfilingLegacyPass(
-    const InstrProfOptions &Options = InstrProfOptions(), bool IsCS = false);
-
-ModulePass *createInstrOrderFilePass();
-
-// Insert DataFlowSanitizer (dynamic data flow analysis) instrumentation
-ModulePass *createDataFlowSanitizerLegacyPassPass(
-    const std::vector<std::string> &ABIListFiles = std::vector<std::string>());
+// Create the variable for profile sampling.
+void createProfileSamplingVar(Module &M);
 
 // Options for sanitizer coverage instrumentation.
 struct SanitizerCoverageOptions {
@@ -160,6 +156,7 @@ struct SanitizerCoverageOptions {
   bool StackDepth = false;
   bool TraceLoads = false;
   bool TraceStores = false;
+  bool CollectControlFlow = false;
 
   SanitizerCoverageOptions() = default;
 };

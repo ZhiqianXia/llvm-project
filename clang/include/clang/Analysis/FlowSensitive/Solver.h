@@ -14,10 +14,12 @@
 #ifndef LLVM_CLANG_ANALYSIS_FLOWSENSITIVE_SOLVER_H
 #define LLVM_CLANG_ANALYSIS_FLOWSENSITIVE_SOLVER_H
 
-#include "clang/Analysis/FlowSensitive/Value.h"
+#include "clang/Analysis/FlowSensitive/Formula.h"
+#include "clang/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
+#include <vector>
 
 namespace clang {
 namespace dataflow {
@@ -45,8 +47,7 @@ public:
 
     /// Constructs a result indicating that the queried boolean formula is
     /// satisfiable. The result will hold a solution found by the solver.
-    static Result
-    Satisfiable(llvm::DenseMap<AtomicBoolValue *, Assignment> Solution) {
+    static Result Satisfiable(llvm::DenseMap<Atom, Assignment> Solution) {
       return Result(Status::Satisfiable, std::move(Solution));
     }
 
@@ -60,23 +61,21 @@ public:
 
     /// Returns the status of satisfiability checking on the queried boolean
     /// formula.
-    Status getStatus() const { return Status; }
+    Status getStatus() const { return SATCheckStatus; }
 
     /// Returns a truth assignment to boolean values that satisfies the queried
     /// boolean formula if available. Otherwise, an empty optional is returned.
-    llvm::Optional<llvm::DenseMap<AtomicBoolValue *, Assignment>>
-    getSolution() const {
+    std::optional<llvm::DenseMap<Atom, Assignment>> getSolution() const {
       return Solution;
     }
 
   private:
-    Result(
-        enum Status Status,
-        llvm::Optional<llvm::DenseMap<AtomicBoolValue *, Assignment>> Solution)
-        : Status(Status), Solution(std::move(Solution)) {}
+    Result(Status SATCheckStatus,
+           std::optional<llvm::DenseMap<Atom, Assignment>> Solution)
+        : SATCheckStatus(SATCheckStatus), Solution(std::move(Solution)) {}
 
-    Status Status;
-    llvm::Optional<llvm::DenseMap<AtomicBoolValue *, Assignment>> Solution;
+    Status SATCheckStatus;
+    std::optional<llvm::DenseMap<Atom, Assignment>> Solution;
   };
 
   virtual ~Solver() = default;
@@ -87,8 +86,14 @@ public:
   /// Requirements:
   ///
   ///  All elements in `Vals` must not be null.
-  virtual Result solve(llvm::DenseSet<BoolValue *> Vals) = 0;
+  virtual Result solve(llvm::ArrayRef<const Formula *> Vals) = 0;
+
+  // Did the solver reach its resource limit?
+  virtual bool reachedLimit() const = 0;
 };
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &, const Solver::Result &);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &, Solver::Result::Assignment);
 
 } // namespace dataflow
 } // namespace clang

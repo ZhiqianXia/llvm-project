@@ -1,7 +1,6 @@
 set(LLVM_TARGET_DEFINITIONS LLGSOptions.td)
 tablegen(LLVM LLGSOptions.inc -gen-opt-parser-defs)
 add_public_tablegen_target(LLGSOptionsTableGen)
-set_target_properties(LLGSOptionsTableGen PROPERTIES FOLDER "lldb misc")
 
 set(LLDB_PLUGINS)
 
@@ -51,8 +50,10 @@ add_lldb_tool(lldb-server
       lldbVersion
       ${LLDB_PLUGINS}
       lldbPluginInstructionARM
+      lldbPluginInstructionLoongArch
       lldbPluginInstructionMIPS
       lldbPluginInstructionMIPS64
+      lldbPluginInstructionRISCV
       ${LLDB_SYSTEM_LIBS}
 
     LINK_COMPONENTS

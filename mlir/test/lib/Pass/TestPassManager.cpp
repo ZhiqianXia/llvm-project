@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TestDialect.h"
+#include "TestOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -53,6 +54,8 @@ struct TestOptionsPass
     : public PassWrapper<TestOptionsPass, OperationPass<func::FuncOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestOptionsPass)
 
+  enum Enum { One, Two };
+
   struct Options : public PassPipelineOptions<Options> {
     ListOption<int> listOption{*this, "list",
                                llvm::cl::desc("Example list option")};
@@ -60,6 +63,10 @@ struct TestOptionsPass
         *this, "string-list", llvm::cl::desc("Example string list option")};
     Option<std::string> stringOption{*this, "string",
                                      llvm::cl::desc("Example string option")};
+    Option<Enum> enumOption{
+        *this, "enum", llvm::cl::desc("Example enum option"),
+        llvm::cl::values(clEnumValN(0, "zero", "Example zero value"),
+                         clEnumValN(1, "one", "Example one value"))};
   };
   TestOptionsPass() = default;
   TestOptionsPass(const TestOptionsPass &) : PassWrapper() {}
@@ -67,6 +74,7 @@ struct TestOptionsPass
     listOption = options.listOption;
     stringOption = options.stringOption;
     stringListOption = options.stringListOption;
+    enumOption = options.enumOption;
   }
 
   void runOnOperation() final {}
@@ -81,6 +89,10 @@ struct TestOptionsPass
       *this, "string-list", llvm::cl::desc("Example string list option")};
   Option<std::string> stringOption{*this, "string",
                                    llvm::cl::desc("Example string option")};
+  Option<Enum> enumOption{
+      *this, "enum", llvm::cl::desc("Example enum option"),
+      llvm::cl::values(clEnumValN(0, "zero", "Example zero value"),
+                       clEnumValN(1, "one", "Example one value"))};
 };
 
 /// A test pass that always aborts to enable testing the crash recovery
@@ -129,7 +141,7 @@ struct TestInvalidIRPass
       signalPassFailure();
     if (!emitInvalidIR)
       return;
-    OpBuilder b(getOperation().getBody());
+    OpBuilder b(getOperation().getFunctionBody());
     OperationState state(b.getUnknownLoc(), "test.any_attr_of_i32_str");
     b.create(state);
   }
@@ -156,7 +168,7 @@ struct TestInvalidParentPass
   }
   void runOnOperation() final {
     FunctionOpInterface op = getOperation();
-    OpBuilder b(getOperation().getBody());
+    OpBuilder b(op.getFunctionBody());
     b.create<test::TestCallOp>(op.getLoc(), TypeRange(), "some_unknown_func",
                                ValueRange());
   }
@@ -172,10 +184,17 @@ struct TestStatisticPass
   StringRef getArgument() const final { return "test-stats-pass"; }
   StringRef getDescription() const final { return "Test pass statistics"; }
 
+  // Use a couple of statistics to verify their ordering
+  // in the print out. The statistics are registered in the order
+  // of construction, so put "num-ops2" before "num-ops" and
+  // make sure that the order is reversed.
+  Statistic opCountDuplicate{this, "num-ops2",
+                             "Number of operations counted one more time"};
   Statistic opCount{this, "num-ops", "Number of operations counted"};
 
   void runOnOperation() final {
     getOperation()->walk([&](Operation *) { ++opCount; });
+    getOperation()->walk([&](Operation *) { ++opCountDuplicate; });
   }
 };
 } // namespace
@@ -221,13 +240,6 @@ void registerPassManagerTestPass() {
   PassPipelineRegistration<>("test-textual-pm-nested-pipeline",
                              "Test a nested pipeline in the pass manager",
                              testNestedPipelineTextual);
-  PassPipelineRegistration<>(
-      "test-dump-pipeline",
-      "Dumps the pipeline build so far for debugging purposes",
-      [](OpPassManager &pm) {
-        pm.printAsTextualPipeline(llvm::errs());
-        llvm::errs() << "\n";
-      });
 
   PassPipelineRegistration<TestOptionsPass::Options>
       registerOptionsPassPipeline(

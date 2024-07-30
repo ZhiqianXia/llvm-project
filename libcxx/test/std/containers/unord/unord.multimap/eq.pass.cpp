@@ -49,7 +49,7 @@ int main(int, char**)
         };
         const C c1(std::begin(a), std::end(a));
         const C c2;
-        assert(testComparisons2(c1, c2, false));
+        assert(testEquality(c1, c2, false));
     }
     {
         typedef std::unordered_multimap<int, std::string> C;
@@ -70,7 +70,7 @@ int main(int, char**)
         };
         const C c1(std::begin(a), std::end(a));
         const C c2 = c1;
-        assert(testComparisons2(c1, c2, true));
+        assert(testEquality(c1, c2, true));
     }
     {
         typedef std::unordered_multimap<int, std::string> C;
@@ -92,11 +92,11 @@ int main(int, char**)
         C c1(std::begin(a), std::end(a));
         C c2 = c1;
         c2.rehash(30);
-        assert(testComparisons2(c1, c2, true));
+        assert(testEquality(c1, c2, true));
         c2.insert(P(90, "ninety"));
-        assert(testComparisons2(c1, c2, false));
+        assert(testEquality(c1, c2, false));
         c1.insert(P(90, "ninety"));
-        assert(testComparisons2(c1, c2, true));
+        assert(testEquality(c1, c2, true));
     }
     {
         typedef std::unordered_multimap<int, std::string> C;
@@ -117,10 +117,10 @@ int main(int, char**)
         };
         C c1(std::begin(a), std::end(a));
         C c2 = c1;
-        assert(testComparisons2(c1, c2, true));
+        assert(testEquality(c1, c2, true));
         c1.insert(P(70, "seventy 2"));
         c2.insert(P(80, "eighty 2"));
-        assert(testComparisons2(c1, c2, false));
+        assert(testEquality(c1, c2, false));
     }
 #if TEST_STD_VER >= 11
     {
@@ -143,7 +143,7 @@ int main(int, char**)
         };
         const C c1(std::begin(a), std::end(a));
         const C c2;
-        assert(testComparisons2(c1, c2, false));
+        assert(testEquality(c1, c2, false));
     }
     {
         typedef std::unordered_multimap<int, std::string, std::hash<int>, std::equal_to<int>,
@@ -165,7 +165,7 @@ int main(int, char**)
         };
         const C c1(std::begin(a), std::end(a));
         const C c2 = c1;
-        assert(testComparisons2(c1, c2, true));
+        assert(testEquality(c1, c2, true));
     }
     {
         typedef std::unordered_multimap<int, std::string, std::hash<int>, std::equal_to<int>,
@@ -188,11 +188,11 @@ int main(int, char**)
         C c1(std::begin(a), std::end(a));
         C c2 = c1;
         c2.rehash(30);
-        assert(testComparisons2(c1, c2, true));
+        assert(testEquality(c1, c2, true));
         c2.insert(P(90, "ninety"));
-        assert(testComparisons2(c1, c2, false));
+        assert(testEquality(c1, c2, false));
         c1.insert(P(90, "ninety"));
-        assert(testComparisons2(c1, c2, true));
+        assert(testEquality(c1, c2, true));
     }
     {
         typedef std::unordered_multimap<int, std::string, std::hash<int>, std::equal_to<int>,
@@ -214,12 +214,37 @@ int main(int, char**)
         };
         C c1(std::begin(a), std::end(a));
         C c2 = c1;
-        assert(testComparisons2(c1, c2, true));
+        assert(testEquality(c1, c2, true));
         c1.insert(P(70, "seventy 2"));
         c2.insert(P(80, "eighty 2"));
-        assert(testComparisons2(c1, c2, false));
+        assert(testEquality(c1, c2, false));
     }
 #endif
 
-  return 0;
+    // Make sure we take into account the number of times that a key repeats into equality.
+    {
+        typedef std::pair<int, char> P;
+        P a[] = {P(1, 'a'), P(1, 'b'),            P(1, 'd'), P(2, 'b')};
+        P b[] = {P(1, 'a'), P(1, 'b'), P(1, 'b'), P(1, 'd'), P(2, 'b')};
+
+        std::unordered_multimap<int, char> c1(std::begin(a), std::end(a));
+        std::unordered_multimap<int, char> c2(std::begin(b), std::end(b));
+        assert(testEquality(c1, c2, false));
+    }
+
+    // Make sure we incorporate the values into the equality of the maps.
+    // If we were to compare only the keys (including how many time each key repeats),
+    // the following test would fail cause only the values differ.
+    {
+        typedef std::pair<int, char> P;
+        P a[] = {P(1, 'a'), P(1, 'b'), P(1, 'd'), P(2, 'b')};
+        P b[] = {P(1, 'a'), P(1, 'b'), P(1, 'E'), P(2, 'b')};
+        //                                   ^ different here
+
+        std::unordered_multimap<int, char> c1(std::begin(a), std::end(a));
+        std::unordered_multimap<int, char> c2(std::begin(b), std::end(b));
+        assert(testEquality(c1, c2, false));
+    }
+
+    return 0;
 }
